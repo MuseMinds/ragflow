@@ -264,6 +264,17 @@ USER root
 
 WORKDIR /ragflow
 
+# MuseMind serves only the private RAG API/task-executor paths and the
+# PDF/plain/Markdown ingestion profile. Node/npm are builder-only, Tika is used
+# only by unsupported DOC/PPT fallbacks, and the legacy libssl1.1 package has no
+# installed reverse dependency. Keep those vulnerable artifacts out of the
+# production filesystem while leaving the upstream build stage unchanged.
+RUN apt-get purge -y nodejs libssl1.1 && \
+    apt-get autoremove -y && \
+    rm -rf /usr/lib/node_modules /root/.npm \
+        /ragflow/tika-server-standard-3.3.0.jar \
+        /ragflow/tika-server-standard-3.3.0.jar.md5
+
 # Copy Python environment and packages
 ENV VIRTUAL_ENV=/ragflow/.venv
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}

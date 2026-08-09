@@ -52,6 +52,59 @@ jobs:
           ! grep -Eq 'git clone .*infiniflow/resource' Dockerfile
           grep -Fq 'uv build --wheel --no-build-isolation ./sdk/python --out-dir /ragflow/sdk-dist' Dockerfile
           grep -Fq 'COPY --from=builder /ragflow/sdk-dist /ragflow/sdk-dist' Dockerfile
+          grep -Fq 'apt-get purge -y nodejs libssl1.1' Dockerfile
+          grep -Fq '/ragflow/tika-server-standard-3.3.0.jar' Dockerfile
+          ! grep -q 'AliyunCodeInterpreterProvider' agent/sandbox/providers/__init__.py agent/sandbox/client.py
+          ! grep -q 'agentrun-sdk' pyproject.toml
+
+      - name: Verify locked C-01 remediation floors
+        run: |
+          .venv/bin/python - <<'PY'
+          from importlib.metadata import PackageNotFoundError, version
+          from packaging.version import Version
+          import xgboost
+
+          floors = {
+              "aiohttp": "3.14.3",
+              "azure-core": "1.38.0",
+              "cbor2": "5.9.0",
+              "cryptography": "50.0.0",
+              "curl-cffi": "0.15.0",
+              "httplib2": "0.32.0",
+              "json-repair": "0.60.1",
+              "litellm": "1.84.0",
+              "lxml": "6.1.1",
+              "lxml-html-clean": "0.4.5",
+              "mcp": "1.28.1",
+              "mistune": "3.3.0",
+              "nltk": "3.10.0",
+              "orjson": "3.11.6",
+              "pdfminer-six": "20251230",
+              "pillow": "12.3.0",
+              "protobuf": "5.29.6",
+              "pyarrow": "23.0.1",
+              "pyasn1": "0.6.4",
+              "pyjwt": "2.13.0",
+              "pypdf": "6.14.2",
+              "setuptools": "84.0.0",
+              "soupsieve": "2.8.4",
+              "urllib3": "2.7.0",
+              "xgboost-cpu": "2.1.4",
+          }
+
+          for distribution, floor in floors.items():
+              resolved = Version(version(distribution))
+              assert resolved >= Version(floor), f"{distribution} {resolved} < {floor}"
+
+          assert xgboost.__version__ == version("xgboost-cpu")
+
+          try:
+              version("agentrun-sdk")
+          except PackageNotFoundError:
+              pass
+          else:
+              raise AssertionError("agentrun-sdk must not be in the MuseMind runtime")
+          PY
 
       - name: Build the bundled Python SDK artifact
         run: |
@@ -68,6 +121,10 @@ jobs:
           api/apps/restful_apis/document_api.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
+          agent/sandbox/client.py
+          agent/sandbox/providers/__init__.py
+          rag/llm/chat_model.py
+          rag/llm/embedding_model.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
           sdk/python/ragflow_sdk/ragflow.py
@@ -80,6 +137,10 @@ jobs:
           api/apps/restful_apis/document_api.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
+          agent/sandbox/client.py
+          agent/sandbox/providers/__init__.py
+          rag/llm/chat_model.py
+          rag/llm/embedding_model.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
           sdk/python/ragflow_sdk/ragflow.py
@@ -88,6 +149,11 @@ jobs:
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/sdk/test_ragflow_request_timeout.py
+
+      - name: Test remediated embedding provider contracts
+        run: >-
+          .venv/bin/pytest
+          test/unit_test/rag/llm/test_embedding_model.py
 
       - name: Test exact retrieval route
         run: >-
