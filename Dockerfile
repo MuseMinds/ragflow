@@ -1,15 +1,20 @@
 # base stage
-FROM ubuntu:24.04 AS base
+ARG UBUNTU_IMAGE=ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea
+ARG RAGFLOW_DEPS_IMAGE=infiniflow/ragflow_deps@sha256:dfda0dbc4b392d5046a1e81ddf09c1c56f86035a43412538b163c81cc36eb2aa
+
+FROM ${RAGFLOW_DEPS_IMAGE} AS ragflow_deps
+FROM ${UBUNTU_IMAGE} AS base
 USER root
 SHELL ["/bin/bash", "-c"]
 
 ARG NEED_MIRROR=0
+ARG INFINITY_RESOURCE_COMMIT=0937399b60f1949267388548e33ea0d5c0cc25f7
 
 WORKDIR /ragflow
 
 # copy models downloaded via download_deps.py
 RUN mkdir -p /ragflow/rag/res/deepdoc /root/.ragflow
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/huggingface.co,target=/huggingface.co \
+RUN --mount=type=bind,from=ragflow_deps,source=/huggingface.co,target=/huggingface.co \
     tar --exclude='.*' -cf - \
         /huggingface.co/InfiniFlow/text_concat_xgb_v1.0 \
         /huggingface.co/InfiniFlow/deepdoc \
@@ -17,7 +22,7 @@ RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/huggingface.co
 
 # https://github.com/chrismattmann/tika-python
 # This is the only way to run python-tika without internet access. Without this set, the default is to check the tika version and pull latest every time from Apache.
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+RUN --mount=type=bind,from=ragflow_deps,source=/,target=/deps \
     cp -r /deps/nltk_data /root/ && \
     cp /deps/tika-server-standard-3.3.0.jar /deps/tika-server-standard-3.3.0.jar.md5 /ragflow/ && \
     cp /deps/cl100k_base.tiktoken /ragflow/9b5ad71b2ce5302211f9c61530b329a4922fc6a4
@@ -52,10 +57,14 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
 # Download resource from GitHub to /usr/share/infinity
 RUN mkdir -p /usr/share/infinity/resource && \
     if [ "$NEED_MIRROR" == "1" ]; then \
-        git clone --depth 1 --single-branch https://gitee.com/infiniflow/resource /tmp/resource; \
+        resource_repository=https://gitee.com/infiniflow/resource; \
     else \
-        git clone --depth 1 --single-branch https://github.com/infiniflow/resource.git /tmp/resource; \
+        resource_repository=https://github.com/infiniflow/resource.git; \
     fi && \
+    git init /tmp/resource && \
+    git -C /tmp/resource fetch --depth 1 "$resource_repository" "$INFINITY_RESOURCE_COMMIT" && \
+    git -C /tmp/resource checkout --detach FETCH_HEAD && \
+    test "$(git -C /tmp/resource rev-parse HEAD)" = "$INFINITY_RESOURCE_COMMIT" && \
     cp -r /tmp/resource/* /usr/share/infinity/resource && \
     rm -rf /tmp/resource
 
@@ -70,7 +79,7 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+RUN --mount=type=bind,from=ragflow_deps,source=/,target=/deps \
     if [ "$NEED_MIRROR" == "1" ]; then \
         mkdir -p /etc/uv && \
         echo 'python-install-mirror = "https://registry.npmmirror.com/-/binary/python-build-standalone/"' > /etc/uv/uv.toml && \
@@ -127,7 +136,7 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
 # cache path that `local.go:cacheDir()` constructs at runtime —
 # `/root/.cache/stagehand/lib/go_<ver>/stagehand-server-v3-<arch>`.
 ARG STAGEHAND_GO_VERSION=v3.21.0
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+RUN --mount=type=bind,from=ragflow_deps,source=/,target=/deps \
     set -eux; \
     arch="$(uname -m)"; \
     case "$arch" in \
@@ -163,16 +172,16 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
 
 
 # Add dependencies of selenium
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chrome-linux64-121-0-6167-85,target=/chrome-linux64.zip \
+RUN --mount=type=bind,from=ragflow_deps,source=/chrome-linux64-121-0-6167-85,target=/chrome-linux64.zip \
     unzip /chrome-linux64.zip && \
     mv chrome-linux64 /opt/chrome && \
     ln -s /opt/chrome/chrome /usr/local/bin/
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chromedriver-linux64-121-0-6167-85,target=/chromedriver-linux64.zip \
+RUN --mount=type=bind,from=ragflow_deps,source=/chromedriver-linux64-121-0-6167-85,target=/chromedriver-linux64.zip \
     unzip -j /chromedriver-linux64.zip chromedriver-linux64/chromedriver && \
     mv chromedriver /usr/local/bin/ && \
     rm -f /usr/bin/google-chrome
 
-RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+RUN --mount=type=bind,from=ragflow_deps,source=/,target=/deps \
     if [ "$(uname -m)" = "x86_64" ]; then \
         dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_amd64.deb; \
     elif [ "$(uname -m)" = "aarch64" ]; then \

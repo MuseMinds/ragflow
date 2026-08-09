@@ -14,8 +14,9 @@ test does not by itself qualify a runtime bundle.
 - MuseMind development branch: `mm/phase-2-provider-contract`
 - MuseMind source patch commit: `802ef6aac725e0eda53207d7f2fc2a9adbe16874`
 - MuseMind pull request: `MuseMinds/ragflow#2`
+- Merged provider-contract commit: `6800999cbebf841efabd7ed82633a671f9fcda5c`
 - Qualified fork commit: `PENDING`
-- Upstream PRs: none opened; all three patches are MuseMind-specific pending qualification
+- Upstream PRs: none opened; all four patches are MuseMind-specific pending qualification
 
 ## Patch MM-RF-0001 — exact scope
 
@@ -54,6 +55,18 @@ test does not by itself qualify a runtime bundle.
   `PENDING`.
 - Rollback: pin the previous qualified bundle only if its log/timeout behavior has independently
   passed the same hardening evidence; otherwise disable the affected workload.
+
+## Patch MM-RF-0004 — immutable build inputs
+
+- Contract: the C-01 build consumes an OCI-pinned Ubuntu base, an OCI-pinned `ragflow_deps` stage
+  and an exact `infiniflow/resource` commit; tags and default branches are not build authority.
+- Pins resolved 2026-08-09 from the official registries/upstream:
+  `ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea`,
+  `infiniflow/ragflow_deps@sha256:dfda0dbc4b392d5046a1e81ddf09c1c56f86035a43412538b163c81cc36eb2aa`
+  and resource commit `0937399b60f1949267388548e33ea0d5c0cc25f7`.
+- Tests: required CI rejects malformed/mutable defaults; OCI build, SBOM and scan remain `PENDING`.
+- Rollback: select a prior exact qualified bundle. Updating any pin requires a reviewed PR and a new
+  C-01 bundle/evidence run.
 
 ## Qualification status
 
