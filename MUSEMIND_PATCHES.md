@@ -12,6 +12,8 @@ test does not by itself qualify a runtime bundle.
 - Upstream commit: `cb93883f3f8c975eecb2fed81210effeb3bdb06f`
 - MuseMind base commit: `9a8edce43f1b5424166ce83d54c2da927cf0b9f0`
 - MuseMind development branch: `mm/phase-2-provider-contract`
+- MuseMind development commit: `802ef6aac725e0eda53207d7f2fc2a9adbe16874`
+- MuseMind pull request: `MuseMinds/ragflow#2`
 - Qualified fork commit: `PENDING`
 - Upstream PRs: none opened; all three patches are MuseMind-specific pending qualification
 
@@ -58,7 +60,7 @@ test does not by itself qualify a runtime bundle.
 | Evidence | Status |
 |---|---|
 | Source patch and focused tests | Implemented; focused exact route `1`, upload/auth `6`, SDK `8` passed on Python 3.13.14 |
-| Branch protection for `musemind` | `PENDING` |
+| Branch protection for `musemind` | Active 2026-08-09: PR required, admins enforced, conversations resolved, no force-push/delete; required C-01 checks pending workflow |
 | OCI application digest and embedded SDK checksum | `PENDING` |
 | Stateful service digests and config checksum | `PENDING` |
 | SBOM and vulnerability disposition | `PENDING` |
