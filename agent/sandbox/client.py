@@ -73,7 +73,6 @@ def _load_provider_from_settings() -> None:
         # Import and instantiate the provider
         from agent.sandbox.providers import (
             SelfManagedProvider,
-            AliyunCodeInterpreterProvider,
             E2BProvider,
             LocalProvider,
             SSHProvider,
@@ -81,7 +80,6 @@ def _load_provider_from_settings() -> None:
 
         provider_classes = {
             "self_managed": SelfManagedProvider,
-            "aliyun_codeinterpreter": AliyunCodeInterpreterProvider,
             "e2b": E2BProvider,
             "local": LocalProvider,
             "ssh": SSHProvider,

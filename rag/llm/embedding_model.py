@@ -26,7 +26,7 @@ import numpy as np
 import requests
 from ollama import Client
 from openai import OpenAI
-from zhipuai import ZhipuAI
+from zai import ZhipuAiClient
 
 from common import settings
 from common.exceptions import ModelException
@@ -432,7 +432,8 @@ class ZhipuEmbed(Base):
     _FACTORY_NAME = "ZHIPU-AI"
 
     def __init__(self, key, model_name="embedding-2", **kwargs):
-        self.client = ZhipuAI(api_key=key)
+        self.client = ZhipuAiClient(api_key=key)
+        logger.info("ZhipuEmbed initialized: provider=%s, model=%s", self._FACTORY_NAME, model_name)
         self.model_name = model_name
 
     def _max_len(self):
@@ -591,9 +592,9 @@ class MistralEmbed(Base):
     _FACTORY_NAME = "Mistral"
 
     def __init__(self, key, model_name="mistral-embed", base_url=None):
-        from mistralai.client import MistralClient
+        from mistralai.client import Mistral
 
-        self.client = MistralClient(api_key=key)
+        self.client = Mistral(api_key=key)
         self.model_name = model_name
 
     def encode(self, texts: list):
@@ -608,7 +609,7 @@ class MistralEmbed(Base):
             retry_max = 5
             while retry_max > 0:
                 try:
-                    res = self.client.embeddings(input=texts[i : i + batch_size], model=self.model_name)
+                    res = self.client.embeddings.create(inputs=texts[i : i + batch_size], model=self.model_name)
                     ress.extend([d.embedding for d in res.data])
                     token_count += total_token_count_from_response(res)
                     break
@@ -628,7 +629,7 @@ class MistralEmbed(Base):
         retry_max = 5
         while retry_max > 0:
             try:
-                res = self.client.embeddings(input=[truncate(text, DEFAULT_MAX_TOKENS)], model=self.model_name)
+                res = self.client.embeddings.create(inputs=[truncate(text, DEFAULT_MAX_TOKENS)], model=self.model_name)
                 return np.array(res.data[0].embedding), total_token_count_from_response(res)
             except Exception as _e:
                 if retry_max == 1:

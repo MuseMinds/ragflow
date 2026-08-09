@@ -21,8 +21,6 @@ This package contains:
 - base.py: Base interface for all sandbox providers
 - manager.py: Provider manager for managing active provider
 - self_managed.py: Self-managed provider implementation (wraps existing executor_manager)
-- aliyun_codeinterpreter.py: Aliyun Code Interpreter provider implementation
-  Official Documentation: https://help.aliyun.com/zh/functioncompute/fc/sandbox-sandbox-code-interepreter
 - e2b.py: E2B provider implementation
 - local.py: Local process provider implementation
 - ssh.py: Remote SSH provider implementation
@@ -31,7 +29,6 @@ This package contains:
 from .base import SandboxProvider, SandboxInstance, ExecutionResult, SandboxProviderConfigError
 from .manager import ProviderManager
 from .self_managed import SelfManagedProvider
-from .aliyun_codeinterpreter import AliyunCodeInterpreterProvider
 from .e2b import E2BProvider
 from .local import LocalProvider
 from .ssh import SSHProvider
@@ -43,7 +40,6 @@ __all__ = [
     "SandboxProviderConfigError",
     "ProviderManager",
     "SelfManagedProvider",
-    "AliyunCodeInterpreterProvider",
     "E2BProvider",
     "LocalProvider",
     "SSHProvider",
