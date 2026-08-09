@@ -72,7 +72,7 @@ jobs:
 
       - name: Test exact retrieval route
         run: >-
-          uv run pytest
+          uv run pytest --noconftest
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py::TestDocRoutesUnit::test_exact_retrieval_fails_closed_and_validates_provenance
 
       - name: Test create-only upload and token redaction
