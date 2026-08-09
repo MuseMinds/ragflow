@@ -1,0 +1,38 @@
+{
+  "schema": "musemind.ragflow-c04/v1",
+  "base_url": "http://127.0.0.1:9380",
+  "bundle": {
+    "fork_commit": "0000000000000000000000000000000000000000",
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "sdk_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bundle_descriptor_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "museums": [
+    {
+      "name": "museum-alpha",
+      "token_env": "MUSEMIND_C04_MUSEUM_ALPHA_TOKEN",
+      "documents": [
+        {"label": "A", "dataset_id": "replace-alpha-dataset-1", "document_id": "replace-alpha-document-a", "mime_type": "application/pdf", "source_path": "fixtures/alpha-a.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+        {"label": "B", "dataset_id": "replace-alpha-dataset-1", "document_id": "replace-alpha-document-b", "mime_type": "text/plain", "source_path": "fixtures/alpha-b.txt", "size_bytes": 0, "sha256": "replace-with-sha256"},
+        {"label": "C", "dataset_id": "replace-alpha-dataset-2", "document_id": "replace-alpha-document-c", "mime_type": "text/markdown", "source_path": "fixtures/alpha-c.md", "size_bytes": 0, "sha256": "replace-with-sha256", "collision_source_path": "fixtures/alpha-c-collision.md", "collision_size_bytes": 0, "collision_sha256": "replace-with-different-sha256"},
+        {"label": "D", "dataset_id": "replace-alpha-dataset-2", "document_id": "replace-alpha-document-d", "mime_type": "text/plain", "source_path": "fixtures/alpha-d.txt", "size_bytes": 0, "sha256": "replace-with-sha256"}
+      ]
+    },
+    {
+      "name": "museum-beta",
+      "token_env": "MUSEMIND_C04_MUSEUM_BETA_TOKEN",
+      "documents": [
+        {"label": "A", "dataset_id": "replace-beta-dataset-1", "document_id": "replace-beta-document-a", "mime_type": "application/pdf", "source_path": "fixtures/beta-a.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+        {"label": "B", "dataset_id": "replace-beta-dataset-1", "document_id": "replace-beta-document-b", "mime_type": "text/plain", "source_path": "fixtures/beta-b.txt", "size_bytes": 0, "sha256": "replace-with-sha256"},
+        {"label": "C", "dataset_id": "replace-beta-dataset-2", "document_id": "replace-beta-document-c", "mime_type": "text/markdown", "source_path": "fixtures/beta-c.md", "size_bytes": 0, "sha256": "replace-with-sha256", "collision_source_path": "fixtures/beta-c-collision.md", "collision_size_bytes": 0, "collision_sha256": "replace-with-different-sha256"},
+        {"label": "D", "dataset_id": "replace-beta-dataset-2", "document_id": "replace-beta-document-d", "mime_type": "text/plain", "source_path": "fixtures/beta-d.txt", "size_bytes": 0, "sha256": "replace-with-sha256"}
+      ]
+    }
+  ],
+  "timeouts": {
+    "connect_seconds": 5,
+    "read_seconds": 60,
+    "parse_deadline_seconds": 900,
+    "poll_interval_seconds": 2
+  }
+}
