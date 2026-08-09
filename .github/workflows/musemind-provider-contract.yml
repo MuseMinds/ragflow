@@ -50,6 +50,15 @@ jobs:
           grep -Eq '^ARG INFINITY_RESOURCE_COMMIT=[0-9a-f]{40}$' Dockerfile
           ! grep -q 'from=infiniflow/ragflow_deps:latest' Dockerfile
           ! grep -Eq 'git clone .*infiniflow/resource' Dockerfile
+          grep -Fq 'uv build --wheel --no-build-isolation ./sdk/python --out-dir /ragflow/sdk-dist' Dockerfile
+          grep -Fq 'COPY --from=builder /ragflow/sdk-dist /ragflow/sdk-dist' Dockerfile
+
+      - name: Build the bundled Python SDK artifact
+        run: |
+          uv build --wheel --no-build-isolation sdk/python --out-dir /tmp/ragflow-sdk-dist
+          test "$(find /tmp/ragflow-sdk-dist -maxdepth 1 -type f -name 'ragflow_sdk-*.whl' | wc -l)" -eq 1
+          .venv/bin/python -m zipfile --list /tmp/ragflow-sdk-dist/ragflow_sdk-*.whl |
+            grep -F 'ragflow_sdk/modules/dataset.py'
 
       - name: Compile MuseMind provider contract sources
         run: >-
