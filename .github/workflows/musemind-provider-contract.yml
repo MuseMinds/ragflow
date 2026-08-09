@@ -36,14 +36,16 @@ jobs:
           version: 0.11.28
 
       - name: Install Python 3.13 and locked test environment
-        run: uv sync --python 3.13 --group test --frozen
+        run: |
+          uv sync --python 3.13 --group test --frozen
+          uv pip install -e sdk/python
 
       - name: Reject whitespace errors
         run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
 
       - name: Compile MuseMind provider contract sources
         run: >-
-          uv run python -m compileall -q
+          .venv/bin/python -m compileall -q
           api/apps/__init__.py
           api/apps/restful_apis/chunk_api.py
           api/apps/restful_apis/document_api.py
@@ -72,18 +74,16 @@ jobs:
 
       - name: Test exact retrieval route
         run: >-
-          uv run pytest --noconftest
+          .venv/bin/pytest --noconftest
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py::TestDocRoutesUnit::test_exact_retrieval_fails_closed_and_validates_provenance
 
       - name: Test create-only upload and token redaction
         run: >-
-          uv run pytest
+          .venv/bin/pytest
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
 
       - name: Test SDK timeout and exact wire contract
-        env:
-          PYTHONPATH: sdk/python
-        run: uv run pytest test/unit_test/sdk/test_ragflow_request_timeout.py
+        run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
