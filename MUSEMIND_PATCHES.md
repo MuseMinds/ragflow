@@ -26,6 +26,9 @@ test does not by itself qualify a runtime bundle.
 - C-04 harness source: `ad807a77699dc24676da40e0fcfc50028fc0bc4d`
 - Merged C-04 harness commit: `80dd3b66e2f10416b7f72687507ae275451aac7f`
 - C-04 pull request: `MuseMinds/ragflow#9`
+- C-04 clean-preflight fix source: `08dce6593a231e0acfd33c59b1d7eb8715f125cf`
+- Merged C-04 clean-preflight fix: `c24f8942d10964ebd2258ac6372ed69885712712`
+- C-04 clean-preflight fix pull request: `MuseMinds/ragflow#11`
 - Qualified fork commit: `PENDING`
 - Upstream PRs: none opened; all eight patches are MuseMind-specific pending qualification
 
@@ -151,9 +154,12 @@ test does not by itself qualify a runtime bundle.
   namespace, duplicate success, overwrite, ambiguous read-back, parse failure/deadline or duplicate
   chunk IDs prevent `PASSED`. Output excludes tokens, paths, filenames, bytes and raw provider
   messages/errors.
-- Tests: offline fail-closed matrix `12` passed on Python 3.13.14. Required CI passed on PR run
-  `31329923099` and protected-branch merge run `31330292083`; PR `MuseMinds/ragflow#9` merged as
-  `80dd3b66e…`. The live run on the exact protected-branch OCI digest is `PENDING`.
+- Tests: the offline fail-closed matrix is `13` passed on Python 3.13.14. The first live preflight on
+  `bf1c782466…` stopped before mutation because the singular `id` filter returns code `102` for an
+  absent document. PR `MuseMinds/ragflow#11` changed the exact filter to `ids` and added a wire
+  regression; required CI passed on PR run `31335771848` and protected-branch merge run
+  `31335962837`, merged as `c24f8942d…`. A live rerun on a rebuilt exact protected-head OCI digest
+  is `PENDING`.
 - Rollback: remove only the harness/CI step. MM-RF-0002 remains unqualified until equivalent live
   response-loss/concurrency/checksum evidence exists.
 
@@ -162,11 +168,11 @@ test does not by itself qualify a runtime bundle.
 | Evidence | Status |
 |---|---|
 | Source patch and focused tests | Implemented; exact route `1`, upload/auth/provider `8`, SDK `8`, embedding `23` passed on Python 3.13.14 |
-| Required source CI | `musemind-provider-contract` passed for application-remediation PR `MuseMinds/ragflow#5`: PR run `31325124546`, protected-branch merge run `31325377993`, merge commit `90f69de96c21023a0dc741ad8f0e27357a94d77f`. C-02/C-03 harness PR `#7`: PR run `31328879842`, protected-branch merge run `31328950365`, merge commit `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`. C-04 harness PR `#9`: PR run `31329923099`, protected-branch merge run `31330292083`, merge commit `80dd3b66e2f10416b7f72687507ae275451aac7f`. |
+| Required source CI | `musemind-provider-contract` passed for application-remediation PR `MuseMinds/ragflow#5`: PR run `31325124546`, protected-branch merge run `31325377993`, merge commit `90f69de96c21023a0dc741ad8f0e27357a94d77f`. C-02/C-03 harness PR `#7`: PR run `31328879842`, protected-branch merge run `31328950365`, merge commit `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`. C-04 harness PR `#9`: PR run `31329923099`, protected-branch merge run `31330292083`, merge commit `80dd3b66e2f10416b7f72687507ae275451aac7f`. C-04 clean-preflight fix PR `#11`: PR run `31335771848`, protected-branch merge run `31335962837`, merge commit `c24f8942d10964ebd2258ac6372ed69885712712`. |
 | Branch protection for `musemind` | Active 2026-08-09: PR required, admins enforced, conversations resolved, stale reviews dismissed, no force-push/delete; strict required check `musemind-provider-contract` |
-| OCI application digest and embedded SDK checksum | Current candidate: OCI manifest `sha256:b706ec1f79cb6f9d5ba3739c9604d7a773407cef67f8dd1fd1fb94964fe5fd10`; OCI config `sha256:4987234ee17f47c789c917331d8a1676eeae9adbde33792e4ff7a83fbf4ceb8b`; SDK SHA-256 `76e904c44d9daaee000928f3f08355f3c2beb539dbed3bfbc729d09510e1a43b`. Not published or fully qualified. |
-| Stateful service digests and config checksum | Exact index/platform digests and all five SBOM/scans are recorded. Stateful descriptor SHA-256 `dc4200acf7358fdb0746ca553950c5935c156cc2044a82c7335616dbd671c9ca`; application/bundle descriptor SHA-256 `13c7ce19704548f691bb5258d2537c41afd2e09d6c0b141ddf48856e796fc9cb`. The ADR-0032 generation JCS checksum remains `PENDING`. |
+| OCI application digest and embedded SDK checksum | Last published protected-head bundle `bf1c782466…`: private GHCR OCI manifest `sha256:69bbe8eb6e8b9e4f2d554f5f3d977d4070a470585b11a9b9d0e0c1ca7fc8f5ad`; OCI config `sha256:f54e3e466a2c778f2783c6cbf20afce31f3a882c0158f8b66282adb0178987ba`; SDK SHA-256 `7769ff2669a4f788e7dc744c78e42d032e0b62d6a17c6d3008891d55418f2ffc`. The merged C-04 fix requires a new exact protected-head build before live rerun. |
+| Stateful service digests and config checksum | Exact index/platform digests and all five SBOM/scans are recorded. Stateful descriptor SHA-256 `dc4200acf7358fdb0746ca553950c5935c156cc2044a82c7335616dbd671c9ca`; last application/bundle descriptor `bf1c782466…` SHA-256 `01e53520b7d0e2b52339cf284d677267eda4582d780beedb5a472edcfc3ddcff`. The ADR-0032 generation JCS checksum remains `PENDING`. |
 | SBOM and vulnerability disposition | Current application CycloneDX SBOM produced with Syft 1.50.0; Trivy 0.70.0 found 0 Critical and 0 High. Raffaele Berzoini explicitly accepts the exact stateful descriptor's 11 Critical/300 High for `develop` through 2026-09-30, bounded by `MuseMindArchitecture/docs/architecture/reviews/0035-ragflow-c01-stateful-risk-acceptance.md`. Any digest/exposure change invalidates it. |
 | C-01–C-09 reproducible results | C-01 application security `PASSED`; stateful vulnerability disposition `PASSED WITH TEMPORARY RISK ACCEPTANCE`. Exact merged application rebuild/publication and generation checksum remain open, so C-01 artifact closure is `IN PROGRESS`; C-02–C-09 may proceed but all remain pre-publish gates. |
 | C-02/C-03 conformance harness | Offline fail-closed/provenance/config-readback/sanitization matrix `14` passed; live two-museum/dataset run and provider-counter proof are `PENDING`, therefore neither gate is yet `PASSED`. |
-| C-04 conformance harness | Offline manifest/create-adopt/concurrency/checksum/dirty-namespace/chunk-set matrix `12` passed; exact protected-digest live run is `PENDING`, therefore C-04 is not yet `PASSED`. |
+| C-04 conformance harness | Offline manifest/create-adopt/concurrency/checksum/dirty-namespace/chunk-set matrix `13` passed. The first exact live preflight failed before mutation on the now-fixed singular-ID filter; rebuilt protected-digest rerun is `PENDING`, therefore C-04 is not yet `PASSED`. |
