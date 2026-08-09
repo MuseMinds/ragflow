@@ -237,3 +237,35 @@ def test_http_list_uses_exact_plural_ids_filter(tmp_path, monkeypatch):
     assert status == 200
     assert body["code"] == 0
     assert observed["params"] == {"ids": document.document_id, "page": 1, "page_size": 2}
+
+
+def test_http_chunk_list_respects_api_page_size_limit(tmp_path, monkeypatch):
+    config = load_config(_manifest(tmp_path))
+    document = config.museums[0].document("A")
+    observed = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"code": 0, "data": {"total": 0, "chunks": []}}
+
+    def get(url, *, headers, params, timeout):
+        observed.update(url=url, headers=headers, params=params, timeout=timeout)
+        return Response()
+
+    monkeypatch.setattr("tools.musemind_conformance.create_adopt.requests.get", get)
+    _, _, _, _, list_chunks = _build_http_transports(
+        config,
+        {"ALPHA_TOKEN": "alpha", "BETA_TOKEN": "beta"},
+    )
+
+    status, body = list_chunks("museum-alpha", document)
+
+    assert status == 200
+    assert body["code"] == 0
+    assert observed["url"].endswith(f"/api/v1/datasets/{document.dataset_id}/documents/{document.document_id}/chunks")
+    assert observed["headers"] == {"Authorization": "Bearer alpha"}
+    assert observed["params"] == {"page": 1, "page_size": 100}
+    assert observed["timeout"] == (5.0, 60.0)
