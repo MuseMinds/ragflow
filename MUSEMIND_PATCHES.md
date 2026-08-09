@@ -20,7 +20,7 @@ test does not by itself qualify a runtime bundle.
 - C-01 application-remediation source: `75a4d7c72a9ff8083750310707f64c08daa3d98b`
 - Merged application-remediation commit: `90f69de96c21023a0dc741ad8f0e27357a94d77f`
 - Qualified fork commit: `PENDING`
-- Upstream PRs: none opened; all six patches are MuseMind-specific pending qualification
+- Upstream PRs: none opened; all seven patches are MuseMind-specific pending qualification
 
 ## Patch MM-RF-0001 — exact scope
 
@@ -114,6 +114,20 @@ test does not by itself qualify a runtime bundle.
 - Rollback: keep publication disabled or select a prior fully qualified immutable bundle. Do not
   restore the vulnerable artifacts to production to regain unsupported MIME/provider behavior.
 
+## Patch MM-RF-0007 — C-02/C-03 conformance harness
+
+- Contract: a manifest-driven live runner exercises two isolated museum tenants, two stable
+  datasets per museum, synthetic A/B/C/D documents across all ADR-0029 MIME types, A+B+C versus
+  A+B+D exact scope, pair and tenant denial, provenance and TOC/KG denial on one pinned bundle.
+- Fail-closed evidence: the runner rejects mutable/all-zero bundle identities and invalid fixture
+  topology, emits no token/query/content/raw error, invalidates the entire result on rogue or
+  missing provenance and cannot report `PASSED` without an actual retriever-call counter proving
+  zero delta around rejected scope requests.
+- Tests: offline matrix `14` passed on Python 3.13.14; existing exact route `1` and SDK `8` tests
+  remained green. Live two-museum run on the exact protected-branch OCI digest is `PENDING`.
+- Rollback: remove the harness only; this patch changes no served route or provider behavior. C-02
+  and C-03 remain unqualified until equivalent reproducible evidence exists.
+
 ## Qualification status
 
 | Evidence | Status |
@@ -125,3 +139,4 @@ test does not by itself qualify a runtime bundle.
 | Stateful service digests and config checksum | Exact index/platform digests and all five SBOM/scans are recorded. Stateful descriptor SHA-256 `dc4200acf7358fdb0746ca553950c5935c156cc2044a82c7335616dbd671c9ca`; application/bundle descriptor SHA-256 `13c7ce19704548f691bb5258d2537c41afd2e09d6c0b141ddf48856e796fc9cb`. The ADR-0032 generation JCS checksum remains `PENDING`. |
 | SBOM and vulnerability disposition | Current application CycloneDX SBOM produced with Syft 1.50.0; Trivy 0.70.0 found 0 Critical and 0 High. Raffaele Berzoini explicitly accepts the exact stateful descriptor's 11 Critical/300 High for `develop` through 2026-09-30, bounded by `MuseMindArchitecture/docs/architecture/reviews/0035-ragflow-c01-stateful-risk-acceptance.md`. Any digest/exposure change invalidates it. |
 | C-01–C-09 reproducible results | C-01 application security `PASSED`; stateful vulnerability disposition `PASSED WITH TEMPORARY RISK ACCEPTANCE`. Exact merged application rebuild/publication and generation checksum remain open, so C-01 artifact closure is `IN PROGRESS`; C-02–C-09 may proceed but all remain pre-publish gates. |
+| C-02/C-03 conformance harness | Offline fail-closed/provenance/config-readback/sanitization matrix `14` passed; live two-museum/dataset run and provider-counter proof are `PENDING`, therefore neither gate is yet `PASSED`. |
