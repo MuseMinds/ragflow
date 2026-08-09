@@ -511,7 +511,16 @@ class FileService(CommonService):
 
     @classmethod
     @DB.connection_context()
-    def upload_document(self, kb, file_objs, user_id, src="local", parent_path: str | None = None, parser_config_override: dict | None = None):
+    def upload_document(
+        self,
+        kb,
+        file_objs,
+        user_id,
+        src="local",
+        parent_path: str | None = None,
+        parser_config_override: dict | None = None,
+        create_only: bool = False,
+    ):
         root_folder = self.get_root_folder(user_id)
         pf_id = root_folder["id"]
         self.init_knowledgebase_docs(pf_id, user_id)
@@ -532,6 +541,9 @@ class FileService(CommonService):
             doc_id = file.id if hasattr(file, "id") else get_uuid()
             e, doc = DocumentService.get_by_id(doc_id)
             if e:
+                if create_only:
+                    err.append(file.filename + ": Document ID already exists; verify it through exact read-back before adoption.")
+                    continue
                 try:
                     if str(doc.kb_id) != str(kb.id):
                         logging.warning(
@@ -570,19 +582,18 @@ class FileService(CommonService):
                     raise RuntimeError("This type of file has not been supported yet!")
 
                 location = filename if not safe_parent_path else f"{safe_parent_path}/{filename}"
+                if create_only and settings.STORAGE_IMPL.obj_exist(kb.id, location):
+                    raise RuntimeError("Storage identity already exists for caller-supplied document ID.")
                 while settings.STORAGE_IMPL.obj_exist(kb.id, location):
                     location += "_"
 
                 blob = file.read()
                 if filetype == FileType.PDF.value:
                     blob = read_potential_broken_pdf(blob)
-                settings.STORAGE_IMPL.put(kb.id, location, blob)
-
                 img = thumbnail_img(filename, blob)
                 thumbnail_location = ""
                 if img is not None:
                     thumbnail_location = f"thumbnail_{doc_id}.png"
-                    settings.STORAGE_IMPL.put(kb.id, thumbnail_location, img)
 
                 incoming_fp = getattr(file, "fingerprint", None)
                 doc = {
@@ -601,9 +612,30 @@ class FileService(CommonService):
                     "thumbnail": thumbnail_location,
                     "content_hash": incoming_fp or xxhash.xxh128(blob).hexdigest(),
                 }
-                DocumentService.insert(doc)
-
-                FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
+                if create_only:
+                    with DB.atomic():
+                        DocumentService.insert(doc)
+                    try:
+                        settings.STORAGE_IMPL.put(kb.id, location, blob)
+                        if img is not None:
+                            settings.STORAGE_IMPL.put(kb.id, thumbnail_location, img)
+                        with DB.atomic():
+                            FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
+                    except Exception:
+                        try:
+                            if settings.STORAGE_IMPL.obj_exist(kb.id, location):
+                                settings.STORAGE_IMPL.rm(kb.id, location)
+                            if thumbnail_location and settings.STORAGE_IMPL.obj_exist(kb.id, thumbnail_location):
+                                settings.STORAGE_IMPL.rm(kb.id, thumbnail_location)
+                        finally:
+                            DocumentService.delete_document_and_update_kb_counts(doc_id)
+                        raise
+                else:
+                    settings.STORAGE_IMPL.put(kb.id, location, blob)
+                    if img is not None:
+                        settings.STORAGE_IMPL.put(kb.id, thumbnail_location, img)
+                    DocumentService.insert(doc)
+                    FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
                 files.append((doc, blob))
             except Exception as e:
                 err.append(file.filename + ": " + str(e))

@@ -38,8 +38,8 @@ class Base:
                     pr[name] = value
         return pr
 
-    def post(self, path, json=None, stream=False, files=None):
-        res = self.rag.post(path, json, stream=stream, files=files)
+    def post(self, path, json=None, stream=False, files=None, data=None):
+        res = self.rag.post(path, json, stream=stream, files=files, data=data)
         return res
 
     def get(self, path, params=None):

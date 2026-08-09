@@ -61,6 +61,7 @@ from api.utils.api_utils import (
     check_duplicate_ids,
 )
 from api.utils.pagination_utils import validate_rest_api_page_size
+from api.utils.musemind_provider_contract import prepare_exact_document_upload
 from api.utils.validation_utils import (
     UpdateDocumentReq,
     format_validation_error_message,
@@ -455,6 +456,10 @@ async def upload_document(dataset_id, tenant_id):
         name: parent_path
         type: string
         description: Optional nested path under the parent folder. Uses '/' separators.
+      - in: formData
+        name: document_id
+        type: string
+        description: Optional 32-character lowercase hex ID for a single create-only local upload.
       - in: query
         name: return_raw_files
         type: boolean
@@ -637,6 +642,11 @@ async def _upload_local_documents(kb, tenant_id):
         return get_error_data_result(message="No file part!", code=RetCode.ARGUMENT_ERROR)
 
     file_objs = files.getlist("file")
+    requested_document_id = (form.get("document_id") or "").strip()
+    try:
+        create_only = prepare_exact_document_upload(file_objs, requested_document_id)
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
     for file_obj in file_objs:
         if file_obj is None or file_obj.filename is None or file_obj.filename == "":
             logging.error("No file selected!")
@@ -668,6 +678,7 @@ async def _upload_local_documents(kb, tenant_id):
         tenant_id,
         parent_path=form.get("parent_path"),
         parser_config_override=parser_config_override,
+        create_only=create_only,
     )
 
     # Handle partial success: some files uploaded successfully, some had errors

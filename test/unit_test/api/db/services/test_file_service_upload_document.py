@@ -123,6 +123,35 @@ def test_upload_document_skips_cross_kb_document_id_collision(monkeypatch):
     assert "Existing document id collision with another knowledge base; skipping update." in err[0]
 
 
+@pytest.mark.p2
+def test_upload_document_create_only_never_reads_or_overwrites_existing_id(monkeypatch):
+    kb = SimpleNamespace(
+        id="kb-target",
+        tenant_id="tenant-1",
+        name="Target KB",
+        parser_id="default",
+        pipeline_id=None,
+        parser_config={},
+    )
+    existing_doc = SimpleNamespace(id="doc-1", kb_id="kb-target")
+    upload = _DummyUploadFile(filename="opaque.txt", doc_id="doc-1")
+
+    monkeypatch.setattr(FileService, "get_root_folder", classmethod(lambda cls, _uid: {"id": "root"}))
+    monkeypatch.setattr(FileService, "init_knowledgebase_docs", classmethod(lambda cls, _pf_id, _uid: None))
+    monkeypatch.setattr(FileService, "get_kb_folder", classmethod(lambda cls, _uid: {"id": "kb-root"}))
+    monkeypatch.setattr(
+        FileService,
+        "new_a_file_from_kb",
+        classmethod(lambda cls, _tenant_id, _name, _parent_id: {"id": "kb-folder"}),
+    )
+    monkeypatch.setattr(file_service_module.DocumentService, "get_by_id", lambda _doc_id: (True, existing_doc))
+
+    err, files = _unwrapped_upload_document()(FileService, kb, [upload], "user-1", create_only=True)
+
+    assert files == []
+    assert err == ["opaque.txt: Document ID already exists; verify it through exact read-back before adoption."]
+
+
 # ---------------------------------------------------------------------------
 # Helpers shared by TestValidateUrlForCrawl
 # ---------------------------------------------------------------------------

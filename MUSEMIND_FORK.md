@@ -4,6 +4,10 @@ This repository is a fork of [infiniflow/ragflow](https://github.com/infiniflow/
 
 The goal of this fork is **not** to create an independent RAGFlow distribution. MuseMind should stay as close as possible to official RAGFlow releases and carry only a small, explicit set of changes required by our use case.
 
+The current baseline and every MuseMind runtime patch are recorded in
+[`MUSEMIND_PATCHES.md`](MUSEMIND_PATCHES.md). Bundle qualification must use an exact fork commit and
+must update that ledger with the image/SDK/service digests and the evidence actually exercised.
+
 ## Branch model
 
 ### Default branch

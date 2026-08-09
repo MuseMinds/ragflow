@@ -25,32 +25,43 @@ from .modules.memory import Memory
 
 
 class RAGFlow:
-    def __init__(self, api_key, base_url, version="v1"):
+    def __init__(self, api_key, base_url, version="v1", request_timeout=(5, 60)):
         """
         api_url: http://<host_address>/api/v1
         """
+        if request_timeout is None:
+            raise ValueError("request_timeout must remain bounded")
         self.user_key = api_key
         self.api_url = f"{base_url}/api/{version}"
         self.authorization_header = {"Authorization": "{} {}".format("Bearer", self.user_key)}
+        self.request_timeout = request_timeout
 
-    def post(self, path, json=None, stream=False, files=None):
-        res = requests.post(url=self.api_url + path, json=json, headers=self.authorization_header, stream=stream, files=files)
+    def post(self, path, json=None, stream=False, files=None, data=None):
+        res = requests.post(
+            url=self.api_url + path,
+            json=json,
+            headers=self.authorization_header,
+            stream=stream,
+            files=files,
+            data=data,
+            timeout=self.request_timeout,
+        )
         return res
 
     def get(self, path, params=None, json=None):
-        res = requests.get(url=self.api_url + path, params=params, headers=self.authorization_header, json=json)
+        res = requests.get(url=self.api_url + path, params=params, headers=self.authorization_header, json=json, timeout=self.request_timeout)
         return res
 
     def delete(self, path, json):
-        res = requests.delete(url=self.api_url + path, json=json, headers=self.authorization_header)
+        res = requests.delete(url=self.api_url + path, json=json, headers=self.authorization_header, timeout=self.request_timeout)
         return res
 
     def put(self, path, json):
-        res = requests.put(url=self.api_url + path, json=json, headers=self.authorization_header)
+        res = requests.put(url=self.api_url + path, json=json, headers=self.authorization_header, timeout=self.request_timeout)
         return res
 
     def patch(self, path, json):
-        res = requests.patch(url=self.api_url + path, json=json, headers=self.authorization_header)
+        res = requests.patch(url=self.api_url + path, json=json, headers=self.authorization_header, timeout=self.request_timeout)
         return res
 
     def create_dataset(
@@ -229,6 +240,38 @@ class RAGFlow:
                 chunks.append(chunk)
             return chunks
         raise Exception(res.get("message"))
+
+    def retrieve_exact(
+        self,
+        document_scope: list[dict[str, str]],
+        question: str,
+        page: int = 1,
+        page_size: int = 30,
+        similarity_threshold: float = 0.2,
+        vector_similarity_weight: float = 0.3,
+        top_k: int = 1024,
+    ):
+        if not document_scope:
+            raise ValueError("document_scope must be non-empty")
+        expected_fields = {"dataset_id", "document_id"}
+        if any(not isinstance(pair, dict) or set(pair) != expected_fields for pair in document_scope):
+            raise ValueError("each document_scope entry must contain only dataset_id and document_id")
+        if any(not isinstance(value, str) or not value.strip() for pair in document_scope for value in pair.values()):
+            raise ValueError("each exact dataset_id and document_id must be a non-empty string")
+        data_json = {
+            "exact_mode": True,
+            "document_scope": document_scope,
+            "question": question,
+            "page": page,
+            "page_size": page_size,
+            "similarity_threshold": similarity_threshold,
+            "vector_similarity_weight": vector_similarity_weight,
+            "top_k": top_k,
+        }
+        res = self.post("/retrieval", json=data_json).json()
+        if res.get("code") != 0:
+            raise Exception(res.get("message"))
+        return [Chunk(self, chunk_data) for chunk_data in res["data"].get("chunks", [])]
 
     def list_agents(self, page: int = 1, page_size: int = 30, orderby: str = "update_time", desc: bool = True) -> list[Agent]:
         res = self.get(

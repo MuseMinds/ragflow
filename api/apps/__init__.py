@@ -177,8 +177,8 @@ def _load_user(auth_types=None):
                     g.user = user[0]
                     return user[0]
             g.auth_error_message = "Authentication error: API key is invalid! "
-        except Exception as e_beta:
-            logging.warning(f"load_user from beta token got exception {e_beta}")
+        except Exception:
+            logging.warning("load_user from beta token failed")
             g.auth_error_message = "Authentication error: API key is invalid!"
 
     # Try JWT decoding
@@ -204,8 +204,8 @@ def _load_user(auth_types=None):
                 g.user = user[0]
                 return user[0]
             return None
-        except Exception as e_jwt:
-            logging.warning(f"load_user from jwt got exception {e_jwt}")
+        except Exception:
+            logging.warning("load_user from jwt failed")
 
     # JWT decode failed, try as api_token
     if AUTH_API in auth_types:
@@ -222,9 +222,9 @@ def _load_user(auth_types=None):
                     return user[0]
                 logging.warning(f"load_user: No user found for tenant_id={objs[0].tenant_id} from APIToken")
             else:
-                logging.warning(f"load_user: No APIToken found for token={auth_token[:10]}...")
-        except Exception as e_api_token:
-            logging.warning(f"load_user from api token got exception {e_api_token}")
+                logging.warning("load_user: No APIToken found for supplied token")
+        except Exception:
+            logging.warning("load_user from api token failed")
 
     return None
 

@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import re
+from pathlib import Path
 from typing import Any
 
 from .base import Base
@@ -63,6 +65,24 @@ class DataSet(Base):
                 doc_list.append(document)
             return doc_list
         raise Exception(res.get("message"))
+
+    def create_document_exact(self, document_id: str, display_name: str, blob: bytes):
+        if re.fullmatch(r"[0-9a-f]{32}", document_id) is None:
+            raise ValueError("document_id must be 32 lowercase hexadecimal characters")
+        suffix = Path(display_name).suffix.lower()
+        opaque_name = f"{document_id}{suffix}"
+        res = self.post(
+            path=f"/datasets/{self.id}/documents",
+            json=None,
+            files=[("file", (opaque_name, blob))],
+            data={"document_id": document_id},
+        ).json()
+        if res.get("code") != 0:
+            raise Exception(res.get("message"))
+        documents = res.get("data") or []
+        if len(documents) != 1 or documents[0].get("id") != document_id:
+            raise Exception("provider returned an incoherent exact document identity")
+        return Document(self.rag, documents[0])
 
     def list_documents(
         self,

@@ -1,0 +1,89 @@
+name: MuseMind provider contract
+
+on:
+  pull_request:
+    branches:
+      - musemind
+  push:
+    branches:
+      - musemind
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musemind-provider-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-contract:
+    name: musemind-provider-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          version: 0.11.28
+
+      - name: Install Python 3.13 and locked test environment
+        run: |
+          uv sync --python 3.13 --group test --frozen
+          uv pip install -e sdk/python
+
+      - name: Reject whitespace errors
+        run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
+
+      - name: Compile MuseMind provider contract sources
+        run: >-
+          .venv/bin/python -m compileall -q
+          api/apps/__init__.py
+          api/apps/restful_apis/chunk_api.py
+          api/apps/restful_apis/document_api.py
+          api/db/services/file_service.py
+          api/utils/musemind_provider_contract.py
+          sdk/python/ragflow_sdk/modules/base.py
+          sdk/python/ragflow_sdk/modules/dataset.py
+          sdk/python/ragflow_sdk/ragflow.py
+
+      - name: Lint MuseMind provider contract sources
+        run: >-
+          uvx --from ruff==0.16.0 ruff check --select E9,F
+          api/apps/__init__.py
+          api/apps/restful_apis/chunk_api.py
+          api/apps/restful_apis/document_api.py
+          api/db/services/file_service.py
+          api/utils/musemind_provider_contract.py
+          sdk/python/ragflow_sdk/modules/base.py
+          sdk/python/ragflow_sdk/modules/dataset.py
+          sdk/python/ragflow_sdk/ragflow.py
+          test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py
+          test/unit_test/api/apps/test_auth_logging_contract.py
+          test/unit_test/api/db/services/test_file_service_upload_document.py
+          test/unit_test/api/utils/test_musemind_provider_contract.py
+          test/unit_test/sdk/test_ragflow_request_timeout.py
+
+      - name: Test exact retrieval route
+        run: >-
+          .venv/bin/pytest --noconftest
+          test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py::TestDocRoutesUnit::test_exact_retrieval_fails_closed_and_validates_provenance
+
+      - name: Test create-only upload and token redaction
+        run: >-
+          .venv/bin/pytest
+          test/unit_test/api/utils/test_musemind_provider_contract.py
+          test/unit_test/api/apps/test_auth_logging_contract.py
+          test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
+          test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
+
+      - name: Test SDK timeout and exact wire contract
+        run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
