@@ -23,8 +23,10 @@ test does not by itself qualify a runtime bundle.
 - C-02/C-03 CI fix/head: `c3fcb7319d2776c1bb063d06eda63983e4c5afa4`
 - Merged C-02/C-03 harness commit: `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`
 - C-02/C-03 pull request: `MuseMinds/ragflow#7`
+- C-04 harness source: `PENDING`
+- C-04 pull request: `PENDING`
 - Qualified fork commit: `PENDING`
-- Upstream PRs: none opened; all seven patches are MuseMind-specific pending qualification
+- Upstream PRs: none opened; all eight patches are MuseMind-specific pending qualification
 
 ## Patch MM-RF-0001 — exact scope
 
@@ -48,8 +50,10 @@ test does not by itself qualify a runtime bundle.
   concurrent loser performs no storage write.
 - Adoption: upload conflict is not success. The caller must exact-read the same dataset/document,
   download the bytes and verify byte count plus SHA-256 before adopting it.
-- Tests: focused route/service tests implemented; C-04 response-loss/concurrency/checksum harness
-  `PENDING`.
+- Tests: focused route/service tests implemented. The manifest-driven C-04 harness provisions the
+  shared two-museum A/B/C/D fixture topology and fails closed on response loss, concurrent claim,
+  checksum collision, dirty namespace or non-terminal/duplicate chunk output. Its offline tests are
+  implemented; a live protected-digest run remains `PENDING`.
 - Rollback: pin the previous qualified bundle and stop new materialization. Do not delete or choose
   an existing document by filename/list order.
 
@@ -134,6 +138,23 @@ test does not by itself qualify a runtime bundle.
 - Rollback: remove the harness only; this patch changes no served route or provider behavior. C-02
   and C-03 remain unqualified until equivalent reproducible evidence exists.
 
+## Patch MM-RF-0008 — C-04 create-or-adopt conformance harness
+
+- Contract: a clean-namespace, manifest-driven runner proves response-loss adoption by exact
+  list/download size+SHA-256, exactly one winner under two concurrent exact-ID creates, immutable
+  bytes under checksum and wrong-dataset collisions, and one non-empty unique chunk set after one
+  parse request per dataset.
+- Fixture reuse: the same two museums, two datasets per museum and A/B/C/D documents provision the
+  exact topology consumed by C-02/C-03 and later clean-namespace C-09 evidence.
+- Fail-closed evidence: mutable/all-zero bundle identity, mismatched local fixture hash, dirty
+  namespace, duplicate success, overwrite, ambiguous read-back, parse failure/deadline or duplicate
+  chunk IDs prevent `PASSED`. Output excludes tokens, paths, filenames, bytes and raw provider
+  messages/errors.
+- Tests: offline fail-closed matrix `12` passed on Python 3.13.14; live run on the exact
+  protected-branch OCI digest is `PENDING`.
+- Rollback: remove only the harness/CI step. MM-RF-0002 remains unqualified until equivalent live
+  response-loss/concurrency/checksum evidence exists.
+
 ## Qualification status
 
 | Evidence | Status |
@@ -146,3 +167,4 @@ test does not by itself qualify a runtime bundle.
 | SBOM and vulnerability disposition | Current application CycloneDX SBOM produced with Syft 1.50.0; Trivy 0.70.0 found 0 Critical and 0 High. Raffaele Berzoini explicitly accepts the exact stateful descriptor's 11 Critical/300 High for `develop` through 2026-09-30, bounded by `MuseMindArchitecture/docs/architecture/reviews/0035-ragflow-c01-stateful-risk-acceptance.md`. Any digest/exposure change invalidates it. |
 | C-01–C-09 reproducible results | C-01 application security `PASSED`; stateful vulnerability disposition `PASSED WITH TEMPORARY RISK ACCEPTANCE`. Exact merged application rebuild/publication and generation checksum remain open, so C-01 artifact closure is `IN PROGRESS`; C-02–C-09 may proceed but all remain pre-publish gates. |
 | C-02/C-03 conformance harness | Offline fail-closed/provenance/config-readback/sanitization matrix `14` passed; live two-museum/dataset run and provider-counter proof are `PENDING`, therefore neither gate is yet `PASSED`. |
+| C-04 conformance harness | Offline manifest/create-adopt/concurrency/checksum/dirty-namespace/chunk-set matrix `12` passed; exact protected-digest live run is `PENDING`, therefore C-04 is not yet `PASSED`. |
