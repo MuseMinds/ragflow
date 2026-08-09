@@ -1,0 +1,34 @@
+{
+  "schema": "musemind.ragflow-c02-c03/v1",
+  "base_url": "http://127.0.0.1:9380",
+  "bundle": {
+    "fork_commit": "0000000000000000000000000000000000000000",
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "sdk_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bundle_descriptor_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "museums": [
+    {
+      "name": "museum-alpha",
+      "token_env": "MUSEMIND_C02_MUSEUM_ALPHA_TOKEN",
+      "documents": [
+        {"label": "A", "dataset_id": "replace-alpha-dataset-1", "document_id": "replace-alpha-document-a", "mime_type": "application/pdf", "marker": "MM-C02-ALPHA-A"},
+        {"label": "B", "dataset_id": "replace-alpha-dataset-1", "document_id": "replace-alpha-document-b", "mime_type": "text/plain", "marker": "MM-C02-ALPHA-B"},
+        {"label": "C", "dataset_id": "replace-alpha-dataset-2", "document_id": "replace-alpha-document-c", "mime_type": "text/markdown", "marker": "MM-C02-ALPHA-C"},
+        {"label": "D", "dataset_id": "replace-alpha-dataset-2", "document_id": "replace-alpha-document-d", "mime_type": "text/plain", "marker": "MM-C02-ALPHA-D"}
+      ]
+    },
+    {
+      "name": "museum-beta",
+      "token_env": "MUSEMIND_C02_MUSEUM_BETA_TOKEN",
+      "documents": [
+        {"label": "A", "dataset_id": "replace-beta-dataset-1", "document_id": "replace-beta-document-a", "mime_type": "application/pdf", "marker": "MM-C02-BETA-A"},
+        {"label": "B", "dataset_id": "replace-beta-dataset-1", "document_id": "replace-beta-document-b", "mime_type": "text/plain", "marker": "MM-C02-BETA-B"},
+        {"label": "C", "dataset_id": "replace-beta-dataset-2", "document_id": "replace-beta-document-c", "mime_type": "text/markdown", "marker": "MM-C02-BETA-C"},
+        {"label": "D", "dataset_id": "replace-beta-dataset-2", "document_id": "replace-beta-document-d", "mime_type": "text/plain", "marker": "MM-C02-BETA-D"}
+      ]
+    }
+  ],
+  "timeouts": {"connect_seconds": 5, "read_seconds": 60},
+  "provider_call_counter": null
+}
