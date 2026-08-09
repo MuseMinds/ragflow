@@ -173,6 +173,7 @@ jobs:
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
+          test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_does_not_nest_connection_context_in_atomic
 
       - name: Test SDK timeout and exact wire contract
         run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
