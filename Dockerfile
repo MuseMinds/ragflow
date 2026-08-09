@@ -232,6 +232,13 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
     # Ensure pip is available in the venv for runtime package installation (fixes #12651)
     .venv/bin/python3 -m ensurepip --upgrade
 
+# Build the Python SDK from the same source revision as the server. MuseMind
+# qualification records the checksum of this wheel together with the OCI image
+# digest, so the tested provider contract cannot drift from its client artifact.
+COPY sdk/python ./sdk/python
+RUN uv build --wheel --no-build-isolation ./sdk/python --out-dir /ragflow/sdk-dist && \
+    test "$(find /ragflow/sdk-dist -maxdepth 1 -type f -name 'ragflow_sdk-*.whl' | wc -l)" -eq 1
+
 # Install frontend dependencies — depends only on package manifests so
 # web source / docs changes don't invalidate this layer.
 COPY web/package.json web/package-lock.json web/.npmrc ./web/
@@ -276,6 +283,11 @@ COPY common common
 COPY memory memory
 COPY bin bin
 COPY tools/scripts tools/scripts
+
+# Keep the exact SDK artifact inside the immutable application bundle. The RAG
+# Integration Service extracts and verifies this wheel by checksum; the server
+# runtime does not import it directly.
+COPY --from=builder /ragflow/sdk-dist /ragflow/sdk-dist
 
 COPY docker/service_conf.yaml.template ./conf/service_conf.yaml.template
 COPY docker/entrypoint.sh ./
