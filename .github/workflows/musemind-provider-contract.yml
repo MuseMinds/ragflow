@@ -43,6 +43,14 @@ jobs:
       - name: Reject whitespace errors
         run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
 
+      - name: Require immutable C-01 build inputs
+        run: |
+          grep -Eq '^ARG UBUNTU_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile
+          grep -Eq '^ARG RAGFLOW_DEPS_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile
+          grep -Eq '^ARG INFINITY_RESOURCE_COMMIT=[0-9a-f]{40}$' Dockerfile
+          ! grep -q 'from=infiniflow/ragflow_deps:latest' Dockerfile
+          ! grep -Eq 'git clone .*infiniflow/resource' Dockerfile
+
       - name: Compile MuseMind provider contract sources
         run: >-
           .venv/bin/python -m compileall -q
