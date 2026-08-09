@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from tools.musemind_conformance.create_adopt import ConformanceRunner, ManifestError, load_config
+from tools.musemind_conformance.create_adopt import ConformanceRunner, ManifestError, _build_http_transports, load_config
 
 
 def _write_fixture(path, content):
@@ -211,3 +211,29 @@ def test_dirty_namespace_stops_before_any_provider_mutation(tmp_path):
     assert result["clean_namespace_proof"] is False
     assert len(provider.documents) == 1
     assert provider.parse_calls == []
+
+
+def test_http_list_uses_exact_plural_ids_filter(tmp_path, monkeypatch):
+    config = load_config(_manifest(tmp_path))
+    document = config.museums[0].document("A")
+    observed = {}
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"code": 0, "data": {"total": 0, "docs": []}}
+
+    def get(url, *, headers, params, timeout):
+        observed.update(url=url, headers=headers, params=params, timeout=timeout)
+        return Response()
+
+    monkeypatch.setattr("tools.musemind_conformance.create_adopt.requests.get", get)
+    _, list_document, _, _, _ = _build_http_transports(config, {"ALPHA_TOKEN": "alpha", "BETA_TOKEN": "beta"})
+
+    status, body = list_document("museum-alpha", document)
+
+    assert status == 200
+    assert body["code"] == 0
+    assert observed["params"] == {"ids": document.document_id, "page": 1, "page_size": 2}

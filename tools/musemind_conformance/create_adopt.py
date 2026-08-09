@@ -513,7 +513,7 @@ def _build_http_transports(config: HarnessConfig, environment: Mapping[str, str]
         response = requests.get(
             f"{config.base_url}/api/v1/datasets/{document.dataset_id}/documents",
             headers=headers(museum_name),
-            params={"id": document.document_id, "page": 1, "page_size": 2},
+            params={"ids": document.document_id, "page": 1, "page_size": 2},
             timeout=timeout,
         )
         return response.status_code, json_body(response)
