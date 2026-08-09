@@ -613,14 +613,17 @@ class FileService(CommonService):
                     "content_hash": incoming_fp or xxhash.xxh128(blob).hexdigest(),
                 }
                 if create_only:
-                    with DB.atomic():
-                        DocumentService.insert(doc)
+                    # The service methods below each own a DB.connection_context().
+                    # Wrapping them in DB.atomic() makes the inner context try to
+                    # close the shared connection while a transaction is open.
+                    # The document primary-key insert is the concurrency claim:
+                    # exactly one caller can win, and losers fail before storage.
+                    DocumentService.insert(doc)
                     try:
                         settings.STORAGE_IMPL.put(kb.id, location, blob)
                         if img is not None:
                             settings.STORAGE_IMPL.put(kb.id, thumbnail_location, img)
-                        with DB.atomic():
-                            FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
+                        FileService.add_file_from_kb(doc, kb_folder["id"], kb.tenant_id)
                     except Exception:
                         try:
                             if settings.STORAGE_IMPL.obj_exist(kb.id, location):

@@ -78,6 +78,16 @@ class _DummyUploadFile:
         raise AssertionError("read() should not be called for cross-KB collision path")
 
 
+class _CreateUploadFile:
+    def __init__(self, filename, doc_id, content=b"synthetic fixture"):
+        self.filename = filename
+        self.id = doc_id
+        self.content = content
+
+    def read(self):
+        return self.content
+
+
 def _unwrapped_upload_document():
     return FileService.upload_document.__func__.__wrapped__
 
@@ -150,6 +160,64 @@ def test_upload_document_create_only_never_reads_or_overwrites_existing_id(monke
 
     assert files == []
     assert err == ["opaque.txt: Document ID already exists; verify it through exact read-back before adoption."]
+
+
+@pytest.mark.p2
+def test_upload_document_create_only_does_not_nest_connection_context_in_atomic(monkeypatch):
+    kb = SimpleNamespace(
+        id="kb-target",
+        tenant_id="tenant-1",
+        name="Target KB",
+        parser_id="default",
+        pipeline_id=None,
+        parser_config={},
+    )
+    upload = _CreateUploadFile(filename="doc-1.txt", doc_id="doc-1")
+    inserted = []
+    linked = []
+    stored = []
+
+    monkeypatch.setattr(FileService, "get_root_folder", classmethod(lambda cls, _uid: {"id": "root"}))
+    monkeypatch.setattr(FileService, "init_knowledgebase_docs", classmethod(lambda cls, _pf_id, _uid: None))
+    monkeypatch.setattr(FileService, "get_kb_folder", classmethod(lambda cls, _uid: {"id": "kb-root"}))
+    monkeypatch.setattr(
+        FileService,
+        "new_a_file_from_kb",
+        classmethod(lambda cls, _tenant_id, _name, _parent_id: {"id": "kb-folder"}),
+    )
+    monkeypatch.setattr(FileService, "get_parser", classmethod(lambda cls, *_args: "naive"))
+    monkeypatch.setattr(
+        FileService,
+        "add_file_from_kb",
+        classmethod(lambda cls, doc, folder_id, tenant_id: linked.append((doc, folder_id, tenant_id))),
+    )
+    monkeypatch.setattr(file_service_module.DocumentService, "get_by_id", lambda _doc_id: (False, None))
+    monkeypatch.setattr(file_service_module.DocumentService, "check_doc_health", lambda *_args: None)
+    monkeypatch.setattr(file_service_module.DocumentService, "insert", lambda doc: inserted.append(doc))
+    monkeypatch.setattr(file_service_module, "duplicate_name", lambda _query, **kwargs: kwargs["name"])
+    monkeypatch.setattr(file_service_module, "thumbnail_img", lambda *_args: None)
+    monkeypatch.setattr(
+        file_service_module.settings,
+        "STORAGE_IMPL",
+        SimpleNamespace(
+            obj_exist=lambda *_args: False,
+            put=lambda *args: stored.append(args),
+            rm=lambda *_args: None,
+        ),
+    )
+
+    def fail_if_atomic_is_opened():
+        raise AssertionError("connection-context service calls must not be nested in DB.atomic()")
+
+    monkeypatch.setattr(file_service_module.DB, "atomic", fail_if_atomic_is_opened)
+
+    err, files = _unwrapped_upload_document()(FileService, kb, [upload], "user-1", create_only=True)
+
+    assert err == []
+    assert files == [(inserted[0], upload.content)]
+    assert inserted[0]["id"] == "doc-1"
+    assert len(stored) == 1
+    assert linked == [(inserted[0], "kb-folder", "tenant-1")]
 
 
 # ---------------------------------------------------------------------------
