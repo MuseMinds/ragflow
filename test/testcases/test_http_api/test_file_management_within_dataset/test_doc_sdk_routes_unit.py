@@ -14,16 +14,20 @@
 #  limitations under the License.
 #
 import asyncio
-import inspect
 import importlib.util
+import inspect
 import sys
+from enum import StrEnum
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
 
-from api.db import FileType
+
+class FileType(StrEnum):
+    PDF = "pdf"
+    OTHER = "other"
 
 
 @pytest.fixture(scope="session")
@@ -473,6 +477,7 @@ def _load_doc_module(monkeypatch, module_basename="chunk_api"):
     tenant_model_service_mod.get_model_config_by_id = _get_model_config_by_id
     tenant_model_service_mod.get_model_config_from_provider_instance = _get_model_config_from_provider_instance
     tenant_model_service_mod.get_tenant_default_model_by_type = _get_tenant_default_model_by_type
+    tenant_model_service_mod.split_model_name = lambda model_name: (model_name.split("@", 1)[0], None)
     monkeypatch.setitem(sys.modules, "api.db.joint_services.tenant_model_service", tenant_model_service_mod)
 
     if module_basename == "document_api":
@@ -544,6 +549,81 @@ def _patch_docstore(monkeypatch, module, **kwargs):
 
 @pytest.mark.p2
 class TestDocRoutesUnit:
+    def test_exact_retrieval_fails_closed_and_validates_provenance(self, monkeypatch):
+        module = _load_doc_module(monkeypatch)
+        provider_calls = []
+
+        class _Retriever:
+            async def retrieval(self, *_args, **_kwargs):
+                provider_calls.append(True)
+                return {
+                    "chunks": [
+                        {
+                            "chunk_id": "chunk-1",
+                            "content_with_weight": "content",
+                            "doc_id": "doc-1",
+                            "kb_id": "dataset-1",
+                        }
+                    ],
+                    "total": 1,
+                }
+
+            def retrieval_by_children(self, *_args, **_kwargs):
+                raise AssertionError("exact mode must not expand parent/child chunks")
+
+        monkeypatch.setattr(module.settings, "retriever", _Retriever())
+        monkeypatch.setattr(module, "get_request_json", lambda: _AwaitableValue({"exact_mode": True, "question": "q"}))
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert "document_scope" in res["message"]
+        assert provider_calls == []
+
+        monkeypatch.setattr(
+            module,
+            "get_request_json",
+            lambda: _AwaitableValue({"exact_mode": True, "document_scope": [], "question": "q"}),
+        )
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert "non-empty" in res["message"]
+        assert provider_calls == []
+
+        request_payload = {
+            "exact_mode": True,
+            "document_scope": [{"dataset_id": "dataset-1", "document_id": "doc-1"}],
+            "question": "q",
+        }
+        monkeypatch.setattr(module, "get_request_json", lambda: _AwaitableValue(request_payload))
+        monkeypatch.setattr(module.KnowledgebaseService, "accessible", lambda **_kwargs: True)
+        monkeypatch.setattr(module.KnowledgebaseService, "list_documents_by_ids", lambda _ids: ["doc-1"])
+        monkeypatch.setattr(
+            module.KnowledgebaseService,
+            "get_by_ids",
+            lambda _ids: [SimpleNamespace(embd_id="embedding", tenant_id="tenant-1")],
+        )
+        monkeypatch.setattr(
+            module.KnowledgebaseService,
+            "get_by_id",
+            lambda _id: (True, SimpleNamespace(embd_id="embedding", tenant_id="tenant-1")),
+        )
+        monkeypatch.setattr(module, "split_model_name", lambda _name: ("embedding", "factory"))
+        monkeypatch.setattr(module, "get_model_config_from_provider_instance", lambda *_args, **_kwargs: SimpleNamespace())
+        monkeypatch.setattr(module, "LLMBundle", lambda *_args, **_kwargs: SimpleNamespace())
+        monkeypatch.setattr(module, "label_question", lambda *_args, **_kwargs: {})
+
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert res["code"] == 0
+        assert res["data"]["chunks"][0]["dataset_id"] == "dataset-1"
+        assert res["data"]["chunks"][0]["document_id"] == "doc-1"
+        assert len(provider_calls) == 1
+
+        class _RogueRetriever(_Retriever):
+            async def retrieval(self, *_args, **_kwargs):
+                provider_calls.append(True)
+                return {"chunks": [{"chunk_id": "rogue", "doc_id": "doc-2", "kb_id": "dataset-1"}], "total": 1}
+
+        monkeypatch.setattr(module.settings, "retriever", _RogueRetriever())
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert "invalid or missing provenance" in res["message"]
+
     def test_chunk_positions_validation_error(self, monkeypatch):
         module = _load_restful_chunk_module(monkeypatch)
         with pytest.raises(ValueError) as exc_info:

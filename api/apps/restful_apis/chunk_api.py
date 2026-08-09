@@ -67,6 +67,7 @@ from rag.prompts.generator import cross_languages, keyword_extraction
 
 DOC_STOP_PARSING_INVALID_STATE_MESSAGE = "Can't stop parsing document that has not started or already completed"
 DOC_STOP_PARSING_INVALID_STATE_ERROR_CODE = "DOC_STOP_PARSING_INVALID_STATE"
+EXACT_SCOPE_FIELDS = frozenset({"dataset_id", "document_id"})
 
 
 def _decode_chunk_image_base64(image_base64):
@@ -79,6 +80,39 @@ def _decode_chunk_image_base64(image_base64):
     if not image_binary:
         return None, "`image_base64` is empty"
     return image_binary, None
+
+
+def _resolve_exact_document_scope(req):
+    """Validate MuseMind's fail-closed dataset/document pair contract."""
+    if "exact_mode" in req and not isinstance(req["exact_mode"], bool):
+        return None, "`exact_mode` must be a boolean"
+    if req.get("exact_mode") is not True:
+        return None, None
+
+    scope = req.get("document_scope")
+    if not isinstance(scope, list) or not scope:
+        return None, "`document_scope` must be a non-empty list in exact mode"
+    if "dataset_ids" in req or "document_ids" in req or "metadata_condition" in req:
+        return None, "Exact mode accepts only `document_scope` as retrieval authority"
+    if req.get("toc_enhance") or req.get("use_kg"):
+        return None, "TOC and knowledge-graph expansion are unavailable in exact mode"
+
+    pairs = []
+    seen = set()
+    for item in scope:
+        if not isinstance(item, dict) or set(item) != EXACT_SCOPE_FIELDS:
+            return None, "Each exact scope entry must contain only `dataset_id` and `document_id`"
+        dataset_id = item.get("dataset_id")
+        document_id = item.get("document_id")
+        if not isinstance(dataset_id, str) or not dataset_id.strip():
+            return None, "Exact scope dataset IDs must be non-empty strings"
+        if not isinstance(document_id, str) or not document_id.strip():
+            return None, "Exact scope document IDs must be non-empty strings"
+        pair = (dataset_id, document_id)
+        if pair not in seen:
+            pairs.append(pair)
+            seen.add(pair)
+    return pairs, None
 
 
 def _store_chunk_image_or_error(dataset_id, chunk_id, image_binary):
@@ -313,14 +347,29 @@ async def stop_parsing(tenant_id, dataset_id):
 @add_tenant_id_to_kwargs
 async def retrieval_test(tenant_id):
     req = await get_request_json()
-    if not req.get("dataset_ids"):
-        return get_error_data_result("`dataset_ids` is required.")
-    kb_ids = req["dataset_ids"]
-    if not isinstance(kb_ids, list):
-        return get_error_data_result("`dataset_ids` should be a list")
+    exact_pairs, exact_scope_error = _resolve_exact_document_scope(req)
+    if exact_scope_error:
+        return get_error_data_result(exact_scope_error)
+    exact_mode = exact_pairs is not None
+
+    if exact_mode:
+        kb_ids = list(dict.fromkeys(dataset_id for dataset_id, _ in exact_pairs))
+        doc_ids = list(dict.fromkeys(document_id for _, document_id in exact_pairs))
+    else:
+        if not req.get("dataset_ids"):
+            return get_error_data_result("`dataset_ids` is required.")
+        kb_ids = req["dataset_ids"]
+        if not isinstance(kb_ids, list):
+            return get_error_data_result("`dataset_ids` should be a list")
     for id in kb_ids:
         if not KnowledgebaseService.accessible(kb_id=id, user_id=tenant_id):
+            if exact_mode:
+                return get_error_data_result("An exact scope dataset is not accessible")
             return get_error_data_result(f"You don't own the dataset {id}.")
+    if exact_mode:
+        for dataset_id, document_id in exact_pairs:
+            if document_id not in KnowledgebaseService.list_documents_by_ids([dataset_id]):
+                return get_error_data_result("An exact scope document does not belong to its dataset")
     kbs = KnowledgebaseService.get_by_ids(kb_ids)
     embd_nms = list(set([split_model_name(kb.embd_id)[0] for kb in kbs]))
     if len(embd_nms) != 1:
@@ -332,7 +381,8 @@ async def retrieval_test(tenant_id):
     question = req["question"].strip() if isinstance(req["question"], str) else req["question"]
     if not question:
         return get_result(data={"total": 0, "chunks": [], "doc_aggs": {}})
-    doc_ids = req.get("document_ids", [])
+    if not exact_mode:
+        doc_ids = req.get("document_ids", [])
     use_kg = req.get("use_kg", False)
     toc_enhance = req.get("toc_enhance", False)
     langs = req.get("cross_languages", [])
@@ -408,12 +458,18 @@ async def retrieval_test(tenant_id):
             cks = await settings.retriever.retrieval_by_toc(question, ranks["chunks"], tenant_ids, LLMBundle(kb.tenant_id, chat_model_config), size)
             if cks:
                 ranks["chunks"] = cks
-        ranks["chunks"] = settings.retriever.retrieval_by_children(ranks["chunks"], tenant_ids)
+        if not exact_mode:
+            ranks["chunks"] = settings.retriever.retrieval_by_children(ranks["chunks"], tenant_ids)
         if use_kg:
             chat_model_config = get_tenant_default_model_by_type(kb.tenant_id, LLMType.CHAT)
             ck = await settings.kg_retriever.retrieval(question, [k.tenant_id for k in kbs], kb_ids, embd_mdl, LLMBundle(kb.tenant_id, chat_model_config))
             if ck["content_with_weight"]:
                 ranks["chunks"].insert(0, ck)
+
+        if exact_mode:
+            allowed_pairs = set(exact_pairs)
+            if any((chunk.get("kb_id"), chunk.get("doc_id")) not in allowed_pairs for chunk in ranks["chunks"]):
+                return get_error_data_result("Exact retrieval returned invalid or missing provenance")
 
         for c in ranks["chunks"]:
             c.pop("vector", None)
