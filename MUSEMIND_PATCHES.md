@@ -41,7 +41,7 @@ test does not by itself qualify a runtime bundle.
 - C-05 harness pull request: `MuseMinds/ragflow#17`
 - Merged C-05 harness commit: `6991c50355e77c5e3e5c59b0021cb28ee9315927`
 - C-07M exact-prefix MinIO connector source: `fce8851a30c7aa8fc7c3acdd07501d5a6b8d3c83`
-- C-07M exact-prefix MinIO connector pull request: `PENDING`
+- C-07M exact-prefix MinIO connector pull request: `MuseMinds/ragflow#19`
 - Merged C-07M exact-prefix MinIO connector commit: `PENDING`
 - Fully qualified fork commit: `PENDING` until C-06–C-09 pass
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
