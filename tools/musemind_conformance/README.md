@@ -93,3 +93,43 @@ python -m tools.musemind_conformance.create_adopt \
 
 The C-04 result is live evidence only when it reports `PASSED` against the exact protected-branch
 OCI digest. Offline tests prove only that the harness fails closed; they do not qualify the bundle.
+
+## C-05 parser intake, deadline and canary
+
+`c05_parser_intake` validates the MuseMind-owned byte gate before any RAGFlow call. The complete
+matrix contains valid Italian PDF/plain/Markdown inputs plus MIME/magic mismatch, NUL text,
+non-UTF-8 Markdown, encrypted PDF, corrupt PDF and a 25,000,001-byte input. Every simple-invalid
+case must return its stable content-free reason with a provider-call delta of zero.
+
+The three valid inputs are then uploaded with exact create-only IDs and must reach terminal `DONE`
+with non-empty chunks inside the configured observation deadline. A structurally valid,
+resource-amplifying PDF exercises the separate hang deadline: it must still be non-terminal when
+the deadline expires, accept the exact stop command, remain `CANCEL` throughout the post-cancel
+observation window and expose zero chunks. The timing is evidence for operational tuning, not a
+development SLO.
+
+The manifest pins the runtime bundle and the SHA-256 of the executed C-05 runner. It contains only
+the environment-variable names for the API token and synthetic canary. Copy
+`c05.manifest.example.json` outside the repository evidence directory, fill it from a clean
+qualification namespace, export both values and run:
+
+```bash
+python -m tools.musemind_conformance.c05_parser_intake \
+  --manifest /safe/path/c05.manifest.json \
+  --output /safe/path/c05.result.json
+```
+
+The first pass intentionally returns `INCOMPLETE` after the runtime matrix. Capture content-free
+logs from every qualification service, then finalize the same result:
+
+```bash
+python -m tools.musemind_conformance.c05_parser_intake \
+  --manifest /safe/path/c05.manifest.json \
+  --output /safe/path/c05.result.json \
+  --finalize-log-scan /safe/path/c05.runtime.log
+```
+
+Only the finalized `PASSED` result is live evidence. The runner never emits fixture bytes, source
+paths, raw provider messages or the canary. `trace_sink=NOT_CONFIGURED` is explicit for the local
+qualification topology; a future configured trace sink must be captured and scanned rather than
+silently treated as absent.
