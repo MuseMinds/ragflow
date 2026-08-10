@@ -1,0 +1,41 @@
+{
+  "schema": "musemind.ragflow-c05/v1",
+  "base_url": "http://127.0.0.1:9380",
+  "bundle": {
+    "fork_commit": "0000000000000000000000000000000000000000",
+    "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "sdk_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bundle_descriptor_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "harness_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "museum": {
+    "name": "museum-alpha",
+    "token_env": "MUSEMIND_C05_MUSEUM_TOKEN",
+    "canary_env": "MUSEMIND_C05_CANARY",
+    "dataset_id": "replace-with-clean-dataset-id"
+  },
+  "fixtures": [
+    {"case": "valid_pdf", "document_id": "replace-valid-pdf-id", "mime_type": "application/pdf", "source_path": "fixtures/valid.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "valid_plain", "document_id": "replace-valid-plain-id", "mime_type": "text/plain", "source_path": "fixtures/valid.txt", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "valid_markdown", "document_id": "replace-valid-markdown-id", "mime_type": "text/markdown", "source_path": "fixtures/valid.md", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "parser_bomb", "document_id": "replace-parser-bomb-id", "mime_type": "application/pdf", "source_path": "fixtures/parser-bomb.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "mime_magic_mismatch", "document_id": "replace-mismatch-id", "mime_type": "text/plain", "source_path": "fixtures/mismatch.txt", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "nul_text", "document_id": "replace-nul-id", "mime_type": "text/plain", "source_path": "fixtures/nul.txt", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "non_utf8_text", "document_id": "replace-non-utf8-id", "mime_type": "text/markdown", "source_path": "fixtures/non-utf8.md", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "encrypted_pdf", "document_id": "replace-encrypted-id", "mime_type": "application/pdf", "source_path": "fixtures/encrypted.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "corrupt_pdf", "document_id": "replace-corrupt-id", "mime_type": "application/pdf", "source_path": "fixtures/corrupt.pdf", "size_bytes": 0, "sha256": "replace-with-sha256"},
+    {"case": "oversize", "document_id": "replace-oversize-id", "mime_type": "text/plain", "source_path": "fixtures/oversize.txt", "size_bytes": 25000001, "sha256": "replace-with-sha256"}
+  ],
+  "timeouts": {
+    "connect_seconds": 5,
+    "read_seconds": 60,
+    "pdf_validation_deadline_seconds": 30,
+    "valid_parse_deadline_seconds": 900,
+    "hang_deadline_seconds": 1,
+    "post_cancel_observation_seconds": 15,
+    "poll_interval_seconds": 1
+  },
+  "observability": {
+    "trace_sink": "NOT_CONFIGURED"
+  }
+}

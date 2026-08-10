@@ -128,6 +128,7 @@ jobs:
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
           sdk/python/ragflow_sdk/ragflow.py
+          tools/musemind_conformance/c05_parser_intake.py
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
 
@@ -151,8 +152,10 @@ jobs:
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/sdk/test_ragflow_request_timeout.py
+          test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
           test/unit_test/tools/test_musemind_exact_scope_conformance.py
+          tools/musemind_conformance/c05_parser_intake.py
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
 
@@ -183,3 +186,6 @@ jobs:
 
       - name: Test C-04 conformance harness
         run: .venv/bin/pytest test/unit_test/tools/test_musemind_create_adopt_conformance.py
+
+      - name: Test C-05 conformance harness
+        run: .venv/bin/pytest test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
