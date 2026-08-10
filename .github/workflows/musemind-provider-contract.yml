@@ -125,6 +125,7 @@ jobs:
           agent/sandbox/providers/__init__.py
           rag/llm/chat_model.py
           rag/llm/embedding_model.py
+          rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
           sdk/python/ragflow_sdk/ragflow.py
@@ -144,6 +145,7 @@ jobs:
           agent/sandbox/providers/__init__.py
           rag/llm/chat_model.py
           rag/llm/embedding_model.py
+          rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
           sdk/python/ragflow_sdk/ragflow.py
@@ -151,6 +153,7 @@ jobs:
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
+          test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
           test/unit_test/sdk/test_ragflow_request_timeout.py
           test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
@@ -180,6 +183,12 @@ jobs:
 
       - name: Test SDK timeout and exact wire contract
         run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
+
+      - name: Test MinIO exact-prefix connector contract
+        run: >-
+          .venv/bin/pytest
+          test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
+          test/unit_test/rag/utils/test_minio_conn_ssl.py
 
       - name: Test C-02/C-03 conformance harness
         run: .venv/bin/pytest test/unit_test/tools/test_musemind_exact_scope_conformance.py
