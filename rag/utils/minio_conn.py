@@ -122,14 +122,12 @@ class RAGFlowMinio:
         """
         try:
             if self.bucket:
-                # Single-bucket mode: check bucket exists only (no side effects)
-                exists = self.conn.bucket_exists(self.bucket)
-
-                # Historical:
-                # - Previously wrote "_health_check" to verify write permissions
-                # - Previously auto-created bucket if missing
-
-                return exists
+                # HeadBucket cannot be scoped to an object prefix. Probe the
+                # configured namespace with a prefix-constrained ListObjects
+                # request so pre-provisioned single-bucket deployments can use
+                # least-privilege credentials.
+                self._probe_prefix()
+                return True
             else:
                 # Multi-bucket mode: verify MinIO service connectivity
                 self.conn.list_buckets()
@@ -181,32 +179,37 @@ class RAGFlowMinio:
     @use_prefix_path
     def obj_exist(self, bucket, filename, tenant_id=None):
         try:
-            if not self.conn.bucket_exists(bucket):
-                return False
-            if self.conn.stat_object(bucket, filename):
-                return True
-            else:
-                return False
-        except S3Error as e:
-            if e.code in ["NoSuchKey", "NoSuchBucket", "ResourceNotFound"]:
-                return False
+            return bool(self.conn.stat_object(bucket, filename))
+        except S3Error:
+            return False
         except Exception:
             logging.exception(f"obj_exist {bucket}/{filename} got exception")
             return False
 
     @use_default_bucket
-    def bucket_exists(self, bucket):
+    def bucket_exists(self, bucket, _orig_bucket=None):
         try:
-            if not self.conn.bucket_exists(bucket):
-                return False
-            else:
+            if self.bucket:
+                self._probe_prefix(_orig_bucket)
                 return True
+            return self.conn.bucket_exists(bucket)
         except S3Error as e:
             if e.code in ["NoSuchKey", "NoSuchBucket", "ResourceNotFound"]:
                 return False
+            return False
         except Exception:
             logging.exception(f"bucket_exist {bucket} got exception")
             return False
+
+    def _probe_prefix(self, logical_bucket=None):
+        prefix = self.prefix_path or ""
+        if logical_bucket:
+            prefix = f"{prefix}/{logical_bucket}" if prefix else logical_bucket
+        if prefix:
+            prefix = f"{prefix}/"
+
+        objects = self.conn.list_objects(self.bucket, prefix=prefix, recursive=False)
+        next(iter(objects), None)
 
     @use_default_bucket
     @use_prefix_path
@@ -262,7 +265,7 @@ class RAGFlowMinio:
             src_bucket, src_path = self._resolve_bucket_and_path(src_bucket, src_path)
             dest_bucket, dest_path = self._resolve_bucket_and_path(dest_bucket, dest_path)
 
-            if not self.conn.bucket_exists(dest_bucket):
+            if not self.bucket and not self.conn.bucket_exists(dest_bucket):
                 self.conn.make_bucket(dest_bucket)
 
             try:
