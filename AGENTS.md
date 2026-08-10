@@ -58,6 +58,8 @@ Use this file as the local operating guide for the current codebase. Prefer the 
 - Preserve behavior with focused tests when the behavior is still valid; do not keep tests that protect obsolete behavior.
 - If a surface is only there for compatibility, remove it unless the user asks to keep it.
 - Do not add new compatibility wording in comments or docs.
+- Mirror a qualified MuseMind runtime image to environment ECR without rebuilding it, and fail the
+  workflow unless the destination manifest digest exactly equals the reviewed source digest.
 
 ## Commands
 ### Backend
