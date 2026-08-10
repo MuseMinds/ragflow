@@ -32,6 +32,9 @@ test does not by itself qualify a runtime bundle.
 - C-04 transaction-context fix source: `2a83f701193a388038c12e1b677ac7c625316388`
 - C-04 transaction-context fix pull request: `MuseMinds/ragflow#13`
 - Merged C-04 transaction-context fix: `e2513ed33107a92b5d1a8e53bf5d0279be708eba`
+- C-04 chunk read-back page-size fix source: `eeb4fa0a58d375d202f0c9467e5aead13c2c65b3`
+- C-04 chunk read-back page-size fix pull request: `MuseMinds/ragflow#15`
+- Merged C-04 chunk read-back page-size fix: `201608f54d360700f7fb26a9fffcbc0d9a0d3d25`
 - Qualified fork commit: `PENDING`
 - Upstream PRs: none opened; all eight patches are MuseMind-specific pending qualification
 
@@ -63,7 +66,10 @@ test does not by itself qualify a runtime bundle.
   implemented. The exact `152a870a6…` live run proved the clean namespace, then exposed a nested
   `DB.atomic()`/`DB.connection_context()` failure before any create completed; source fix
   `2a83f7011…` removes that invalid nesting while retaining the document primary key as the
-  concurrency claim. A rebuilt protected-digest rerun remains `PENDING`.
+  concurrency claim. The exact `b829c6809…` rebuilt/published rerun passed every create/adopt,
+  collision and parse-terminal case, then exposed a harness-only `page_size=1000` chunk read-back
+  against the live API maximum `100`; source fix `eeb4fa0a5…` and a wire regression are merged by
+  PR `MuseMinds/ragflow#15`. A new protected-digest rerun remains `PENDING`.
 - Rollback: pin the previous qualified bundle and stop new materialization. Do not delete or choose
   an existing document by filename/list order.
 
@@ -160,7 +166,7 @@ test does not by itself qualify a runtime bundle.
   namespace, duplicate success, overwrite, ambiguous read-back, parse failure/deadline or duplicate
   chunk IDs prevent `PASSED`. Output excludes tokens, paths, filenames, bytes and raw provider
   messages/errors.
-- Tests: the offline fail-closed matrix is `13` passed on Python 3.13.14. The first live preflight on
+- Tests: the offline fail-closed matrix is `14` passed on Python 3.13.14. The first live preflight on
   `bf1c782466…` stopped before mutation because the singular `id` filter returns code `102` for an
   absent document. PR `MuseMinds/ragflow#11` changed the exact filter to `ids` and added a wire
   regression; required CI passed on PR run `31335771848` and protected-branch merge run
@@ -169,7 +175,16 @@ test does not by itself qualify a runtime bundle.
   `DB.atomic()`; content-free result SHA-256
   `ddf2220cef7b57e491138c4ea8babfce22c0223ef3d368e2332aedebd81f4adb`. Source fix
   `2a83f7011…` and its regression passed required CI in PR `MuseMinds/ragflow#13`; the fix merged as
-  `e2513ed33…`. A new protected-digest build and live rerun remain `PENDING`.
+  `e2513ed33…`. The exact protected-head `b829c6809…` application was rebuilt, scanned and
+  published privately as OCI manifest
+  `sha256:ec2954a081cc88faee5e5f1c005122fb606dc87a21a691c7e03630a2d4395e94`. Its fresh live C-04
+  run passed clean preflight, all create/adopt/collision cases, four parse requests and terminal
+  `DONE` with one metadata chunk for every document, but the harness requested chunk page size
+  `1000` while the API maximum is `100`; all eight read-backs failed closed. Content-free result
+  SHA-256 `ff16d801949c6ed2ac22921fe0daf45015e143f2e4d384aba61a1f5967e81f56`.
+  PR `MuseMinds/ragflow#15` caps the request at `100` and adds an exact wire regression; required CI
+  passed on PR run `31343172258` and protected-branch run `31343255000`, merged as `201608f54…`.
+  A new exact protected-digest build and fresh live rerun remain `PENDING`.
 - Rollback: remove only the harness/CI step. MM-RF-0002 remains unqualified until equivalent live
   response-loss/concurrency/checksum evidence exists.
 
@@ -178,11 +193,11 @@ test does not by itself qualify a runtime bundle.
 | Evidence | Status |
 |---|---|
 | Source patch and focused tests | Implemented; exact route `1`, upload/auth/provider `9`, SDK `8`, embedding `23` passed on Python 3.13.14. The transaction-context regression also passed in the complete upload service file (`22` tests). |
-| Required source CI | `musemind-provider-contract` passed for application-remediation PR `MuseMinds/ragflow#5`: PR run `31325124546`, protected-branch merge run `31325377993`, merge commit `90f69de96c21023a0dc741ad8f0e27357a94d77f`. C-02/C-03 harness PR `#7`: PR run `31328879842`, protected-branch merge run `31328950365`, merge commit `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`. C-04 harness PR `#9`: PR run `31329923099`, protected-branch merge run `31330292083`, merge commit `80dd3b66e2f10416b7f72687507ae275451aac7f`. C-04 clean-preflight fix PR `#11`: PR run `31335771848`, protected-branch merge run `31335962837`, merge commit `c24f8942d10964ebd2258ac6372ed69885712712`. C-04 transaction-context fix PR `#13`: PR run `31338206113`, protected-branch merge run `31338289729`, merge commit `e2513ed33107a92b5d1a8e53bf5d0279be708eba`. |
+| Required source CI | `musemind-provider-contract` passed for application-remediation PR `MuseMinds/ragflow#5`: PR run `31325124546`, protected-branch merge run `31325377993`, merge commit `90f69de96c21023a0dc741ad8f0e27357a94d77f`. C-02/C-03 harness PR `#7`: PR run `31328879842`, protected-branch merge run `31328950365`, merge commit `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`. C-04 harness PR `#9`: PR run `31329923099`, protected-branch merge run `31330292083`, merge commit `80dd3b66e2f10416b7f72687507ae275451aac7f`. C-04 clean-preflight fix PR `#11`: PR run `31335771848`, protected-branch merge run `31335962837`, merge commit `c24f8942d10964ebd2258ac6372ed69885712712`. C-04 transaction-context fix PR `#13`: PR run `31338206113`, protected-branch merge run `31338289729`, merge commit `e2513ed33107a92b5d1a8e53bf5d0279be708eba`. C-04 chunk page-size fix PR `#15`: PR run `31343172258`, protected-branch merge run `31343255000`, merge commit `201608f54d360700f7fb26a9fffcbc0d9a0d3d25`. |
 | Branch protection for `musemind` | Active 2026-08-09: PR required, admins enforced, conversations resolved, stale reviews dismissed, no force-push/delete; strict required check `musemind-provider-contract` |
-| OCI application digest and embedded SDK checksum | Published protected-head bundle `152a870a65…`: private GHCR OCI manifest `sha256:9111c78643b8f3b93db8eb197cc025a973a5293097d748fea6663a8fec3eb6a7`; OCI config `sha256:d16627dfcd6a399743494774ac65239c53128a47d9d8893f41b5cc03b4350f9a`; SDK SHA-256 `7769ff2669a4f788e7dc744c78e42d032e0b62d6a17c6d3008891d55418f2ffc`. Remote manifest bytes exactly matched the local OCI manifest and package visibility was private. The transaction-context fix requires a new exact protected-head build before live rerun. |
-| Stateful service digests and config checksum | Exact index/platform digests and all five SBOM/scans are recorded. Stateful descriptor SHA-256 `dc4200acf7358fdb0746ca553950c5935c156cc2044a82c7335616dbd671c9ca`; application/bundle descriptor `152a870a65…` SHA-256 `23550bc3c1f444258aeeff22e4d17271f31b4ca973f0383a2c63ec1421a2cfaa`. The ADR-0032 generation JCS checksum remains `PENDING`. |
+| OCI application digest and embedded SDK checksum | Published protected-head bundle `b829c6809…`: private GHCR OCI manifest `sha256:ec2954a081cc88faee5e5f1c005122fb606dc87a21a691c7e03630a2d4395e94`; OCI config `sha256:58bded3b0956d72ac9c4abc98e5c5f2e46145823f2a2d8ba88e07bfcd24e6e56`; SDK SHA-256 `7769ff2669a4f788e7dc744c78e42d032e0b62d6a17c6d3008891d55418f2ffc`. Remote tag and immutable-reference manifest bytes exactly matched the local OCI manifest and package visibility was private. The chunk page-size fix requires a new exact protected-head build before live rerun. |
+| Stateful service digests and config checksum | Exact index/platform digests and all five SBOM/scans are recorded. Stateful descriptor SHA-256 `dc4200acf7358fdb0746ca553950c5935c156cc2044a82c7335616dbd671c9ca`; application/bundle descriptor `b829c6809…` SHA-256 `c5cd933fb8891ea8bb948875bfa522a39b4032cd57e9fe26055dd076d6886cad`. The ADR-0032 generation JCS checksum remains `PENDING`. |
 | SBOM and vulnerability disposition | Current application CycloneDX SBOM produced with Syft 1.50.0; Trivy 0.70.0 found 0 Critical and 0 High. Raffaele Berzoini explicitly accepts the exact stateful descriptor's 11 Critical/300 High for `develop` through 2026-09-30, bounded by `MuseMindArchitecture/docs/architecture/reviews/0035-ragflow-c01-stateful-risk-acceptance.md`. Any digest/exposure change invalidates it. |
 | C-01–C-09 reproducible results | C-01 application security `PASSED`; stateful vulnerability disposition `PASSED WITH TEMPORARY RISK ACCEPTANCE`. Exact merged application rebuild/publication and generation checksum remain open, so C-01 artifact closure is `IN PROGRESS`; C-02–C-09 may proceed but all remain pre-publish gates. |
 | C-02/C-03 conformance harness | Offline fail-closed/provenance/config-readback/sanitization matrix `14` passed; live two-museum/dataset run and provider-counter proof are `PENDING`, therefore neither gate is yet `PASSED`. |
-| C-04 conformance harness | Offline manifest/create-adopt/concurrency/checksum/dirty-namespace/chunk-set matrix `13` passed. The exact `152a870a6…` live run passed all eight clean preflights, then failed create operations on an invalid nested transaction/context boundary. Source fix `2a83f7011…` passed the full upload service file (`22` tests), PR `#13`, required CI and protected merge `e2513ed33…`; rebuild and live rerun are `PENDING`, therefore C-04 is not yet `PASSED`. |
+| C-04 conformance harness | Offline manifest/create-adopt/concurrency/checksum/dirty-namespace/chunk-set matrix `14` passed. The exact `b829c6809…` live run passed clean preflight, every create/adopt/collision case and terminal parsing with one metadata chunk per document, then failed all eight chunk read-backs because the harness exceeded the API page-size maximum. Source fix `eeb4fa0a5…` passed PR `#15`, required CI and protected merge `201608f54…`; rebuild and fresh live rerun are `PENDING`, therefore C-04 is not yet `PASSED`. |
