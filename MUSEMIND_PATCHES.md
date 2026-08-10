@@ -40,6 +40,9 @@ test does not by itself qualify a runtime bundle.
 - C-05 harness source commit: `334362095d4a2488152a3509503249073325db9d`
 - C-05 harness pull request: `MuseMinds/ragflow#17`
 - Merged C-05 harness commit: `6991c50355e77c5e3e5c59b0021cb28ee9315927`
+- C-07M exact-prefix MinIO connector source: `fce8851a30c7aa8fc7c3acdd07501d5a6b8d3c83`
+- C-07M exact-prefix MinIO connector pull request: `PENDING`
+- Merged C-07M exact-prefix MinIO connector commit: `PENDING`
 - Fully qualified fork commit: `PENDING` until C-06–C-09 pass
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
   not change served behavior
@@ -217,6 +220,22 @@ test does not by itself qualify a runtime bundle.
   result and 195,635 bytes of runtime log; no trace sink was configured.
 - Rollback: remove only this harness, manifest example and tests. The exact runtime bundle remains
   `ed23c7a7…`; no served route, parser or provider behavior changed.
+
+## Patch MM-RF-0010 — MinIO exact-prefix connector
+
+- Contract: pre-provisioned single-bucket MinIO deployments operate with a non-root identity whose
+  `ListBucket` permission is conditioned to the configured exact prefix; bucket-wide `HeadBucket`,
+  bucket creation and cross-prefix operations remain denied.
+- Enforcement: single-bucket health consumes one prefix-scoped `ListObjects` request; object
+  existence uses exact `StatObject`; copy skips destination bucket probing/creation after both keys
+  have been resolved beneath the configured prefix. Multi-bucket behavior remains unchanged.
+- Tests: source commit `fce8851a30c7aa8fc7c3acdd07501d5a6b8d3c83` adds seven connector
+  regressions and makes them part of required CI. Exact protected-branch merge, new immutable
+  bundle/SBOM/scan and live C-01–C-09 results remain `PENDING`.
+- Upstream status: no PR opened; this is a MuseMind pilot least-privilege patch required by
+  ADR-0034 and Evidence 0026.
+- Rollback: pin a previously fully qualified immutable bundle and stop new publication work. Never
+  restore `HeadBucket`, automatic bucket creation or broad `ListBucket` to preserve availability.
 
 ## Qualification status
 
