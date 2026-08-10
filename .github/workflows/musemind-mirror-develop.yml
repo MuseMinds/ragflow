@@ -1,0 +1,58 @@
+name: MuseMind mirror qualified image to develop
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror-qualified-image:
+    runs-on: ubuntu-24.04
+    environment: develop
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    env:
+      SOURCE_DIGEST: sha256:87a2f9f202e7f0a6084e5f8331b3b10f61de0fc2b3b1f1f8b2f6550b6d6ce5b6
+      SOURCE_IMAGE: ghcr.io/museminds/ragflow
+      TARGET_REPOSITORY: musemind/develop/rag/ragflow
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@451ce2a72e8d729a59ebeaacab82dbce58e7af4c # v6
+        with:
+          aws-region: ${{ vars.AWS_REGION_DEVELOP }}
+          role-to-assume: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN_DEVELOP }}
+
+      - id: ecr
+        name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Log in to the private MuseMind GHCR package
+        shell: bash
+        run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Mirror the exact qualified manifest without rebuilding
+        shell: bash
+        run: |
+          source_ref="${SOURCE_IMAGE}@${SOURCE_DIGEST}"
+          target_tag="qualified-${SOURCE_DIGEST#sha256:}"
+          target_tag="${target_tag:0:22}"
+          target_ref="${{ steps.ecr.outputs.registry }}/${TARGET_REPOSITORY}:${target_tag}"
+
+          docker buildx imagetools inspect "${source_ref}"
+          docker buildx imagetools create --prefer-index=false --tag "${target_ref}" "${source_ref}"
+
+          target_digest="$(aws ecr describe-images \
+            --repository-name "${TARGET_REPOSITORY}" \
+            --image-ids "imageTag=${target_tag}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+          test "${target_digest}" = "${SOURCE_DIGEST}"
+
+          echo "### Develop RAGFlow mirror" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Source and ECR digest: \`${target_digest}\`" >> "${GITHUB_STEP_SUMMARY}"
