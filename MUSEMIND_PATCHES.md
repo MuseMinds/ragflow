@@ -37,7 +37,8 @@ test does not by itself qualify a runtime bundle.
 - Merged C-04 chunk read-back page-size fix: `201608f54d360700f7fb26a9fffcbc0d9a0d3d25`
 - Exact bundle commit exercised through C-05: `ed23c7a7beb5e61d555bdd4a247b89c17a17f976`
 - C-05 harness SHA-256: `8b4e0bcfb574d3e8085d04b3c5a80e7caa99ce20d88d77b710460a69241f78ff`
-- C-05 harness commit/pull request: `PENDING` until this harness-only change is merged
+- C-05 harness source commit: `334362095d4a2488152a3509503249073325db9d`
+- C-05 harness pull request/merged commit: `PENDING` until this harness-only change is merged
 - Fully qualified fork commit: `PENDING` until C-06–C-09 pass
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
   not change served behavior
