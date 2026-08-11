@@ -43,6 +43,9 @@ test does not by itself qualify a runtime bundle.
 - C-07M exact-prefix MinIO connector source: `fce8851a30c7aa8fc7c3acdd07501d5a6b8d3c83`
 - C-07M exact-prefix MinIO connector pull request: `MuseMinds/ragflow#19`
 - Merged C-07M exact-prefix MinIO connector commit: `6bdea2b01fc33b6018fe7cc36a7064acb6ecd89e`
+- Provider service-principal bootstrap source: `90d11e08d10a55f08f190e21e685f1802b889f24`
+- Provider service-principal bootstrap pull request: `MuseMinds/ragflow#23`
+- Merged provider service-principal bootstrap commit: `PENDING`
 - Fully qualified fork commit: `PENDING`; C-01 and local C-02–C-09 passed, but C-07M target
   EC2/EBS stop/start remains a separate deployment qualification
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
@@ -238,6 +241,26 @@ test does not by itself qualify a runtime bundle.
   ADR-0034 and Evidence 0024.
 - Rollback: pin a previously fully qualified immutable bundle and stop new publication work. Never
   restore `HeadBucket`, automatic bucket creation or broad `ListBucket` to preserve availability.
+
+## Patch MM-RF-0011 — provider service-principal bootstrap
+
+- Contract: one stable non-human provider principal exists per logical
+  `(rag_instance_id, environment)` with `User.id = Tenant.id`, one exact `OWNER` relation,
+  `is_superuser = false`, unusable interactive/session identity and only the current plus an
+  explicitly bounded previous raw provider token.
+- Enforcement: the schema-aware one-shot derives deterministic row identities, takes a MySQL
+  advisory lock and reconciles all rows in one ORM transaction. It emits only `CREATED`,
+  `UNCHANGED`, `REPAIRED` or content-free `CONFLICT`, repairs only unambiguous partial state and
+  fails closed on foreign token ownership, unexpected tokens, incompatible ownership or an
+  interactive/privileged principal.
+- Rotation: `reconcile` accepts current and optional previous token files only with a bounded UTC
+  deadline; `revoke-previous` removes only the explicitly identified previous token after smoke.
+  Reversing current/previous supports rollback before revocation.
+- Tests: deterministic identity, clean create/idempotency, compatible repair, fail-closed conflicts,
+  concurrent reconciliation, content-free output and add/smoke/revoke/rollback are covered by 16
+  focused unit tests. Required CI and live clean-namespace qualification are `PENDING`.
+- Rollback: pin the prior qualified bundle and keep the proxy non-ready. Do not seed or edit MySQL
+  manually, create a replacement human principal or grant the permanent proxy database access.
 
 ## Qualification status
 
