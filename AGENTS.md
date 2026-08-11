@@ -60,6 +60,10 @@ Use this file as the local operating guide for the current codebase. Prefer the 
 - Do not add new compatibility wording in comments or docs.
 - Mirror a qualified MuseMind runtime image to environment ECR without rebuilding it, and fail the
   workflow unless the destination manifest digest exactly equals the reviewed source digest.
+- ADR-0037's first API generation is the exact Jina v3 request contract recorded in
+  `MUSEMIND_PATCHES.md`. Reconcile its service-tenant key only through the schema-aware one-shot;
+  provider/model/request changes require a new immutable generation, key rotation does not, and no
+  failure may fall back to TEI/Builtin/another embedder.
 
 ## Commands
 ### Backend

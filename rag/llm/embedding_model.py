@@ -544,9 +544,12 @@ class YoudaoEmbed(Base):
 
 class JinaMultiVecEmbed(Base):
     _FACTORY_NAME = "Jina"
+    _V3_MODEL = "jina-embeddings-v3"
+    _V3_ENDPOINT = "https://api.jina.ai/v1/embeddings"
+    _V3_DIMENSION = 1024
 
     def __init__(self, key, model_name="jina-embeddings-v4", base_url="https://api.jina.ai/v1/embeddings"):
-        self.base_url = "https://api.jina.ai/v1/embeddings"
+        self.base_url = (base_url or self._V3_ENDPOINT).strip()
         self.headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
         self.model_name = model_name
 
@@ -563,21 +566,45 @@ class JinaMultiVecEmbed(Base):
 
     def encode(self, texts: list[str | bytes], task="retrieval.passage"):
         def _call(batch):
-            data = {"model": self.model_name, "input": [self._as_input_item(t) for t in batch]}
+            if self.model_name == self._V3_MODEL:
+                if self.base_url != self._V3_ENDPOINT:
+                    raise EmbeddingError("Jina v3 endpoint differs from the qualified MuseMind request contract")
+                if any(not isinstance(text, str) for text in batch):
+                    raise EmbeddingError("Jina v3 MuseMind generation accepts text inputs only")
+                data = {
+                    "model": self.model_name,
+                    "input": batch,
+                    "task": task,
+                    "truncate": True,
+                    "normalized": True,
+                    "embedding_type": "float",
+                    "dimensions": self._V3_DIMENSION,
+                    "late_chunking": False,
+                }
+            else:
+                data = {"model": self.model_name, "input": [self._as_input_item(t) for t in batch]}
             if "v4" in self.model_name:
                 data["return_multivector"] = True
-            if "v3" in self.model_name or "v4" in self.model_name:
+            if self.model_name != self._V3_MODEL and ("v3" in self.model_name or "v4" in self.model_name):
                 data["task"] = task
                 data["truncate"] = True  # let Jina truncate oversized inputs server-side
             response = requests.post(self.base_url, headers=self.headers, json=data, timeout=30)
             _raise_model_exception_if_failed(response)
             res = response.json()
             embs = []
-            for d in res["data"]:
+            response_items = sorted(res["data"], key=lambda item: item.get("index", 0))
+            for d in response_items:
                 if data.get("return_multivector", False):  # v4
                     embs.append(np.asarray(d["embeddings"], dtype=np.float32).mean(axis=0))
                 else:  # v2/v3
-                    embs.append(np.asarray(d["embedding"], dtype=np.float32))
+                    embedding = np.asarray(d["embedding"], dtype=np.float32)
+                    if self.model_name == self._V3_MODEL:
+                        if embedding.shape != (self._V3_DIMENSION,) or not np.isfinite(embedding).all():
+                            raise EmbeddingError("Jina v3 response violates the qualified dimension/finite-value contract")
+                        norm = float(np.linalg.norm(embedding))
+                        if not np.isclose(norm, 1.0, rtol=1e-4, atol=1e-5):
+                            raise EmbeddingError("Jina v3 response violates the qualified normalization contract")
+                    embs.append(embedding)
             return embs, total_token_count_from_response(res)
 
         # Inputs may be image bytes, so token truncation is left to the server.

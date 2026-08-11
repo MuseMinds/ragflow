@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from api.db.musemind_provider_identity import (
+    EmbeddingAuthorizationState,
     MembershipState,
     ProviderIdentitySpec,
     ProviderSnapshot,
@@ -27,6 +28,8 @@ from api.db.musemind_provider_identity import (
 INSTANCE_ID = "11111111-2222-4333-8444-555555555555"
 CURRENT_TOKEN = "c" * 64
 PREVIOUS_TOKEN = "p" * 64
+JINA_API_KEY = "jina_" + "j" * 59
+ROTATED_JINA_API_KEY = "jina_" + "r" * 59
 
 
 class MemoryStore:
@@ -35,6 +38,7 @@ class MemoryStore:
         self.tenants: dict[str, TenantState] = {}
         self.memberships: dict[str, MembershipState] = {}
         self.tokens: set[tuple[str, str]] = set()
+        self.embedding_authorizations: dict[str, EmbeddingAuthorizationState] = {}
         self.lock = threading.Lock()
 
     @contextmanager
@@ -55,6 +59,7 @@ class MemoryStore:
             memberships=memberships,
             tenant_tokens=tenant_tokens,
             desired_token_owners=desired_token_owners,
+            embedding_authorizations=tuple(self.embedding_authorizations.values()),
         )
 
     def create_user(self, spec: ProviderIdentitySpec) -> None:
@@ -76,7 +81,36 @@ class MemoryStore:
         self.users[spec.principal_id] = replace(self.users[spec.principal_id], nickname=spec.nickname)
 
     def create_tenant(self, spec: ProviderIdentitySpec) -> None:
-        self.tenants[spec.principal_id] = TenantState(id=spec.principal_id, name=spec.nickname, status="1")
+        self.tenants[spec.principal_id] = TenantState(
+            id=spec.principal_id,
+            name=spec.nickname,
+            embd_id="jina-embeddings-v3@Jina",
+            status="1",
+        )
+
+    def repair_tenant_embedding_default(self, spec: ProviderIdentitySpec) -> None:
+        self.tenants[spec.principal_id] = replace(
+            self.tenants[spec.principal_id],
+            embd_id="jina-embeddings-v3@Jina",
+        )
+
+    def create_embedding_authorization(self, spec: ProviderIdentitySpec) -> None:
+        self.embedding_authorizations[spec.principal_id] = EmbeddingAuthorizationState(
+            tenant_id=spec.principal_id,
+            llm_factory="Jina",
+            model_type="embedding",
+            llm_name="jina-embeddings-v3",
+            api_key=spec.jina_api_key,
+            api_base="https://api.jina.ai/v1/embeddings",
+            max_tokens=8192,
+            status="1",
+        )
+
+    def rotate_embedding_credential(self, spec: ProviderIdentitySpec) -> None:
+        self.embedding_authorizations[spec.principal_id] = replace(
+            self.embedding_authorizations[spec.principal_id],
+            api_key=spec.jina_api_key,
+        )
 
     def create_owner_membership(self, spec: ProviderIdentitySpec) -> None:
         self.memberships[spec.membership_id] = MembershipState(
@@ -100,11 +134,13 @@ def make_spec(
     current: str = CURRENT_TOKEN,
     previous: str | None = None,
     operation: str = "reconcile",
+    jina_api_key: str = JINA_API_KEY,
 ) -> ProviderIdentitySpec:
     return ProviderIdentitySpec(
         rag_instance_id=INSTANCE_ID,
         environment="develop",
         current_token=current,
+        jina_api_key=jina_api_key,
         previous_token=previous,
         operation=operation,
     )
@@ -154,10 +190,10 @@ def test_clean_create_then_second_run_is_unchanged():
     unchanged = reconcile_provider_identity(store, spec)
 
     assert created.outcome == "CREATED"
-    assert created.created_rows == 4
+    assert created.created_rows == 5
     assert unchanged.outcome == "UNCHANGED"
     assert len(store.users) == len(store.tenants) == 1
-    assert len(store.memberships) == len(store.tokens) == 1
+    assert len(store.memberships) == len(store.tokens) == len(store.embedding_authorizations) == 1
 
 
 def test_compatible_partial_state_is_repaired():
@@ -186,6 +222,24 @@ def test_compatible_nickname_drift_is_repaired():
     assert result.outcome == "REPAIRED"
     assert result.repaired_rows == 1
     assert store.users[spec.principal_id].nickname == spec.nickname
+
+
+def test_embedding_default_and_key_rotation_are_repaired_without_generation_change():
+    store = MemoryStore()
+    spec = make_spec()
+    reconcile_provider_identity(store, spec)
+    store.tenants[spec.principal_id] = replace(store.tenants[spec.principal_id], embd_id="stale@Builtin")
+
+    repaired = reconcile_provider_identity(
+        store,
+        make_spec(jina_api_key=ROTATED_JINA_API_KEY),
+    )
+
+    assert repaired.outcome == "REPAIRED"
+    assert repaired.repaired_rows == 2
+    assert store.tenants[spec.principal_id].embd_id == "jina-embeddings-v3@Jina"
+    assert store.embedding_authorizations[spec.principal_id].api_key == ROTATED_JINA_API_KEY
+    assert repaired.embedding_credential_fingerprint
 
 
 @pytest.mark.parametrize(
@@ -222,6 +276,16 @@ def test_compatible_nickname_drift_is_repaired():
                 ),
             ),
             "DEBUG_MEMBERSHIP_CONFLICT",
+        ),
+        (
+            lambda store, spec: store.embedding_authorizations.__setitem__(
+                spec.principal_id,
+                replace(
+                    store.embedding_authorizations[spec.principal_id],
+                    api_base="https://example.invalid/v1/embeddings",
+                ),
+            ),
+            "EMBEDDING_AUTHORIZATION_CONFLICT",
         ),
     ],
 )
@@ -321,7 +385,7 @@ def test_two_concurrent_runs_create_once_and_remain_exact():
 
     assert sorted(outcomes) == ["CREATED", "UNCHANGED"]
     assert len(store.users) == len(store.tenants) == 1
-    assert len(store.memberships) == len(store.tokens) == 1
+    assert len(store.memberships) == len(store.tokens) == len(store.embedding_authorizations) == 1
 
 
 def test_content_free_result_does_not_expose_token_values():
@@ -329,6 +393,7 @@ def test_content_free_result_does_not_expose_token_values():
     serialized = json.dumps(result.content_free_dict(), sort_keys=True)
 
     assert CURRENT_TOKEN not in serialized
+    assert JINA_API_KEY not in serialized
 
 
 def test_secret_file_accepts_one_transport_newline_and_rejects_multiline(tmp_path):
@@ -344,8 +409,10 @@ def test_secret_file_accepts_one_transport_newline_and_rejects_multiline(tmp_pat
 def test_rotation_window_is_required_and_bounded(tmp_path):
     current_file = tmp_path / "current"
     previous_file = tmp_path / "previous"
+    jina_file = tmp_path / "jina"
     current_file.write_text(CURRENT_TOKEN, encoding="ascii")
     previous_file.write_text(PREVIOUS_TOKEN, encoding="ascii")
+    jina_file.write_text(JINA_API_KEY, encoding="ascii")
     parser = _build_parser()
 
     incomplete = parser.parse_args(
@@ -357,6 +424,8 @@ def test_rotation_window_is_required_and_bounded(tmp_path):
             "develop",
             "--current-token-file",
             str(current_file),
+            "--jina-api-key-file",
+            str(jina_file),
             "--previous-token-file",
             str(previous_file),
         ]
@@ -374,6 +443,8 @@ def test_rotation_window_is_required_and_bounded(tmp_path):
             "develop",
             "--current-token-file",
             str(current_file),
+            "--jina-api-key-file",
+            str(jina_file),
             "--previous-token-file",
             str(previous_file),
             "--previous-valid-until",

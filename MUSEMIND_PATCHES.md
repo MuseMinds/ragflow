@@ -328,6 +328,27 @@ test does not by itself qualify a runtime bundle.
 - Rollback: keep the current assertion. Never qualify an image with an empty or unresolvable source
   version merely because its container layers built successfully.
 
+## Patch MM-RF-0015 — API-first Jina v3 generation
+
+- Contract: ADR-0037's first `develop` candidate authorizes only `jina-embeddings-v3@Jina` for the
+  non-human service tenant. The request sends the exact Jina endpoint, 1024 dimensions, query or
+  passage task, normalized float output, truncation and disabled late chunking explicitly; inputs
+  are text-only and no error path selects Builtin, TEI or another provider.
+- Credential lifecycle: the existing schema-aware one-shot also reconciles the tenant embedding
+  default and one exact `tenant_llm` authorization from a mounted Jina key. It repairs only an
+  unambiguous key/default rotation, emits a key fingerprint rather than the secret, and fails closed
+  on endpoint/model/status/row ambiguity. The permanent proxy receives neither MySQL nor the key.
+- Drift/readiness: every live response must be finite, L2-normalized and exactly 1024-dimensional.
+  The content-free synthetic Italian/multilingual probe exercises passage and query adapters and
+  emits only vector fingerprints, aggregate cosine values and token counts for qualification and
+  startup evidence. Numeric material-drift tolerance remains a qualification output before the
+  candidate can become `QUALIFIED`.
+- Tests/evidence: source commit, PR, CI, exact OCI digest, live probe, C-01/C-04/C-05/C-06/C-08/C-09
+  and new generation JCS are `PENDING`. Historical BGE/TEI generation evidence is not relabelled.
+- Rollback: fence the candidate and restore a previously qualified immutable generation. A key
+  rollback uses the secret/one-shot lifecycle and does not mutate generation identity; never fall
+  back automatically to TEI or another embedding model.
+
 ## Qualification status
 
 | Evidence | Status |
