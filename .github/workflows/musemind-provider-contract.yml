@@ -119,6 +119,7 @@ jobs:
           api/apps/__init__.py
           api/apps/restful_apis/chunk_api.py
           api/apps/restful_apis/document_api.py
+          api/db/musemind_provider_identity.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
           agent/sandbox/client.py
@@ -139,6 +140,7 @@ jobs:
           api/apps/__init__.py
           api/apps/restful_apis/chunk_api.py
           api/apps/restful_apis/document_api.py
+          api/db/musemind_provider_identity.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
           agent/sandbox/client.py
@@ -151,6 +153,7 @@ jobs:
           sdk/python/ragflow_sdk/ragflow.py
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py
           test/unit_test/api/apps/test_auth_logging_contract.py
+          test/unit_test/api/db/test_musemind_provider_identity.py
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
@@ -180,6 +183,9 @@ jobs:
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_does_not_nest_connection_context_in_atomic
+
+      - name: Test provider service-principal reconciliation
+        run: .venv/bin/pytest test/unit_test/api/db/test_musemind_provider_identity.py
 
       - name: Test SDK timeout and exact wire contract
         run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
