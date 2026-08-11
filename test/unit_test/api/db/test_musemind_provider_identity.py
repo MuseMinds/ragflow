@@ -17,6 +17,7 @@ from api.db.musemind_provider_identity import (
     TokenState,
     UserState,
     _build_parser,
+    _provider_tenant_defaults,
     _spec_from_args,
     derive_principal_id,
     read_secret_file,
@@ -114,6 +115,35 @@ def test_principal_id_is_stable_and_domain_scoped():
     assert first == derive_principal_id(INSTANCE_ID.upper(), "DEVELOP")
     assert len(first) == 32
     assert first != derive_principal_id(INSTANCE_ID, "production")
+
+
+def test_provider_tenant_defaults_are_loaded_without_full_server_initialization():
+    defaults = _provider_tenant_defaults(
+        {
+            "factory": "OpenAI",
+            "default_models": {
+                "chat_model": "gpt-test",
+                "embedding_model": {
+                    "name": "embedding-test",
+                    "factory": "Local",
+                },
+            },
+        }
+    )
+
+    assert defaults["llm_id"] == "gpt-test@OpenAI"
+    assert defaults["embd_id"] == "embedding-test@Local"
+    assert defaults["asr_id"] == ""
+    assert defaults["parser_ids"]
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [None, {"parsers": None}, {"default_models": {"chat_model": 42}}],
+)
+def test_provider_tenant_defaults_fail_closed_on_malformed_config(settings):
+    with pytest.raises(ReconciliationConflict, match="PROVIDER_DEFAULTS_INVALID"):
+        _provider_tenant_defaults(settings)
 
 
 def test_clean_create_then_second_run_is_unchanged():
