@@ -263,6 +263,25 @@ test does not by itself qualify a runtime bundle.
 - Rollback: pin the prior qualified bundle and keep the proxy non-ready. Do not seed or edit MySQL
   manually, create a replacement human principal or grant the permanent proxy database access.
 
+## Patch MM-RF-0012 — remove unused Selenium Wire dependency
+
+- Contract: `api.utils.web_utils` keeps Selenium `4.32.0` as an explicit runtime dependency, while
+  the unused Selenium Wire interception proxy is absent from the project manifest, lockfile and
+  installed runtime environment.
+- Security outcome: removing Selenium Wire also removes its bundled reusable CA private key and the
+  exclusively transitive `kaitaistruct`, `pydivert` and `zstandard` distributions from the locked
+  graph. No RAGFlow request interception behavior was in use or is replaced.
+- Enforcement: required CI fails if Selenium Wire re-enters the manifest, lockfile or installed
+  environment, and verifies the exact direct Selenium version before running the existing provider
+  contract suite.
+- Tests: source commit `6f756e1305ad44f994b7c3c5946a303b6644d95f` merged through PR
+  `MuseMinds/ragflow#25` as protected commit `2a7be698f48dc5446b85a0186769ac358c54efa1`.
+  Required CI passed in PR run `31489152862` and protected-branch run `31489730264`; local lock
+  consistency, Selenium/web-utils import, Selenium Wire absence, compilation and all `16` provider
+  identity tests passed. Exact rebuilt-bundle qualification is `PENDING`.
+- Rollback: pin the previous fully qualified immutable bundle and keep the proxy non-ready. Do not
+  restore Selenium Wire merely to recover the unused interception behavior or its static CA.
+
 ## Qualification status
 
 | Evidence | Status |
