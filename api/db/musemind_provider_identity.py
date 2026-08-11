@@ -34,6 +34,7 @@ _MAX_SECRET_BYTES = 4096
 _MIN_TOKEN_LENGTH = 32
 _MAX_TOKEN_LENGTH = 255
 _DEFAULT_MAX_DUAL_VALIDITY_SECONDS = 3600
+_DEFAULT_PARSERS = "naive:General,qa:Q&A,resume:Resume,manual:Manual,table:Table,paper:Paper,book:Book,laws:Laws,presentation:Presentation,picture:Picture,one:One,audio:Audio,email:Email,tag:Tag"
 
 
 class ReconciliationConflict(Exception):
@@ -209,6 +210,44 @@ def validate_spec(spec: ProviderIdentitySpec) -> None:
             raise ReconciliationConflict("DUPLICATE_TOKEN_INPUT")
     if spec.operation == "revoke-previous" and spec.previous_token is None:
         raise ReconciliationConflict("PREVIOUS_TOKEN_REQUIRED")
+
+
+def _provider_tenant_defaults(llm_settings: object) -> dict[str, str]:
+    if not isinstance(llm_settings, dict):
+        raise ReconciliationConflict("PROVIDER_DEFAULTS_INVALID")
+    factory = llm_settings.get("factory", "") or ""
+    default_models = llm_settings.get("default_models", {}) or {}
+    parsers = llm_settings.get("parsers", _DEFAULT_PARSERS)
+    if not isinstance(factory, str) or not isinstance(default_models, dict):
+        raise ReconciliationConflict("PROVIDER_DEFAULTS_INVALID")
+    if not isinstance(parsers, str) or not parsers.strip():
+        raise ReconciliationConflict("PROVIDER_DEFAULTS_INVALID")
+
+    def model_name(key: str) -> str:
+        entry = default_models.get(key, "")
+        if isinstance(entry, str):
+            name = entry.strip()
+            model_factory = factory
+        elif isinstance(entry, dict):
+            raw_name = entry.get("name") or entry.get("model") or ""
+            model_factory = entry.get("factory") or factory
+            if not isinstance(raw_name, str) or not isinstance(model_factory, str):
+                raise ReconciliationConflict("PROVIDER_DEFAULTS_INVALID")
+            name = raw_name.strip()
+        else:
+            raise ReconciliationConflict("PROVIDER_DEFAULTS_INVALID")
+        if name and "@" not in name and model_factory:
+            return f"{name}@{model_factory}"
+        return name
+
+    return {
+        "llm_id": model_name("chat_model"),
+        "embd_id": model_name("embedding_model"),
+        "asr_id": model_name("asr_model"),
+        "parser_ids": parsers,
+        "img2txt_id": model_name("image2text_model"),
+        "rerank_id": model_name("rerank_model"),
+    }
 
 
 def _validate_snapshot(spec: ProviderIdentitySpec, snapshot: ProviderSnapshot) -> None:
@@ -391,6 +430,7 @@ class PeeweeProviderIdentityStore:
         self.User = User
         self.UserTenant = UserTenant
         self.settings = settings
+        self.tenant_defaults = _provider_tenant_defaults(settings.get_base_config("user_default_llm", {}) or {})
         self.current_timestamp = current_timestamp
         self.datetime_format = datetime_format
         self.lock_timeout_seconds = lock_timeout_seconds
@@ -502,12 +542,7 @@ class PeeweeProviderIdentityStore:
         self.Tenant.insert(
             id=spec.principal_id,
             name=spec.nickname,
-            llm_id=self.settings.CHAT_MDL,
-            embd_id=self.settings.EMBEDDING_MDL,
-            asr_id=self.settings.ASR_MDL,
-            parser_ids=self.settings.PARSERS,
-            img2txt_id=self.settings.IMAGE2TEXT_MDL,
-            rerank_id=self.settings.RERANK_MDL,
+            **self.tenant_defaults,
             status="1",
             **self._timestamps(),
         ).execute()
