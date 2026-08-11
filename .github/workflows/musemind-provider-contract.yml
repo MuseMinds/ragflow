@@ -52,6 +52,7 @@ jobs:
           ! grep -Eq 'git clone .*infiniflow/resource' Dockerfile
           grep -Fq 'uv build --wheel --no-build-isolation ./sdk/python --out-dir /ragflow/sdk-dist' Dockerfile
           grep -Fq 'COPY --from=builder /ragflow/sdk-dist /ragflow/sdk-dist' Dockerfile
+          grep -Fq 'test -s /ragflow/VERSION' Dockerfile
           grep -Fq 'apt-get purge -y nodejs libssl1.1' Dockerfile
           grep -Fq '/ragflow/tika-server-standard-3.3.0.jar' Dockerfile
           ! grep -q 'AliyunCodeInterpreterProvider' agent/sandbox/providers/__init__.py agent/sandbox/client.py

@@ -253,10 +253,12 @@ RUN --mount=type=cache,id=ragflow_npm,target=/root/.npm,sharing=locked \
 
 COPY .git /ragflow/.git
 
-RUN version_info=$(git describe --tags --match=v* --first-parent --always); \
-    version_info="$version_info"; \
+RUN set -eu; \
+    version_info="$(git describe --tags --match=v* --first-parent --always)"; \
+    test -n "$version_info"; \
     echo "RAGFlow version: $version_info"; \
-    echo $version_info > /ragflow/VERSION
+    printf '%s\n' "$version_info" > /ragflow/VERSION; \
+    test -s /ragflow/VERSION
 
 # production stage
 FROM base AS production

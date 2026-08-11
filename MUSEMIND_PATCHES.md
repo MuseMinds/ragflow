@@ -47,6 +47,7 @@ test does not by itself qualify a runtime bundle.
 - Provider service-principal bootstrap pull request: `MuseMinds/ragflow#23`
 - Merged provider service-principal bootstrap commit: `a7c7f5f14489f94dc4f7ac8c3eb53ca7d3ca4fa1`
 - Provider bootstrap tenant-default fix source: `2c57368804e1a174c5f8cc28f1209593b55c2cbe`
+- Fail-closed build version fix source: `759d6c4c2414d5afdbdf05acda8453c966297793`
 - Fully qualified fork commit: `PENDING`; C-01 and local C-02–C-09 passed, but C-07M target
   EC2/EBS stop/start remains a separate deployment qualification
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
@@ -304,6 +305,24 @@ test does not by itself qualify a runtime bundle.
   clean-namespace bootstrap are pending.
 - Rollback: pin the prior exact bundle and keep the proxy non-ready. Do not initialize the full web
   server from the one-shot or seed the missing tenant field through SQL.
+
+## Patch MM-RF-0014 — fail-closed immutable version build
+
+- Contract: a qualified application image must contain a non-empty `/ragflow/VERSION` derived from
+  the exact checked-out Git commit; an unreadable or incomplete Git object database is a build
+  failure, never a usable anonymous version.
+- Enforcement: the Docker build step now enables shell fail-fast behavior, requires `git describe`
+  to return a non-empty value and verifies the written VERSION artifact. Required CI guards the
+  fail-closed assertion.
+- Incident evidence: the first local no-cache build attempt for protected commit
+  `50b6ba6877342ca95e1670168e9aafe48eef9600` used a shared clone whose Windows alternate object
+  path was not visible to BuildKit. `git describe` failed but the prior multi-command RUN continued
+  and produced an empty VERSION. Local image `sha256:1f2cd40c08c1bcefe58dd93c9f18f02adfd30d56b3f7de4e4e742a21e760b0e6`
+  was rejected before runtime checks, scan or publication and is not qualification evidence.
+- Tests: source commit `759d6c4c2414d5afdbdf05acda8453c966297793`; diff and source guard pass
+  locally. Required CI and a no-local clean rebuild are pending.
+- Rollback: keep the current assertion. Never qualify an image with an empty or unresolvable source
+  version merely because its container layers built successfully.
 
 ## Qualification status
 
