@@ -44,7 +44,7 @@ test does not by itself qualify a runtime bundle.
 - C-07M exact-prefix MinIO connector pull request: `MuseMinds/ragflow#19`
 - Merged C-07M exact-prefix MinIO connector commit: `6bdea2b01fc33b6018fe7cc36a7064acb6ecd89e`
 - Provider service-principal bootstrap source: `90d11e08d10a55f08f190e21e685f1802b889f24`
-- Provider service-principal bootstrap pull request: `PENDING`
+- Provider service-principal bootstrap pull request: `MuseMinds/ragflow#23`
 - Merged provider service-principal bootstrap commit: `PENDING`
 - Fully qualified fork commit: `PENDING`; C-01 and local C-02–C-09 passed, but C-07M target
   EC2/EBS stop/start remains a separate deployment qualification
