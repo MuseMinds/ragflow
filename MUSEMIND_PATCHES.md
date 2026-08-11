@@ -46,6 +46,7 @@ test does not by itself qualify a runtime bundle.
 - Provider service-principal bootstrap source: `90d11e08d10a55f08f190e21e685f1802b889f24`
 - Provider service-principal bootstrap pull request: `MuseMinds/ragflow#23`
 - Merged provider service-principal bootstrap commit: `a7c7f5f14489f94dc4f7ac8c3eb53ca7d3ca4fa1`
+- Provider bootstrap tenant-default fix source: `2c57368804e1a174c5f8cc28f1209593b55c2cbe`
 - Fully qualified fork commit: `PENDING`; C-01 and local C-02–C-09 passed, but C-07M target
   EC2/EBS stop/start remains a separate deployment qualification
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
@@ -284,6 +285,25 @@ test does not by itself qualify a runtime bundle.
   bounded `develop` risk acceptance and C-01 is `PASSED WITH TEMPORARY RISK ACCEPTANCE`.
 - Rollback: pin the previous fully qualified immutable bundle and keep the proxy non-ready. Do not
   restore Selenium Wire merely to recover the unused interception behavior or its static CA.
+
+## Patch MM-RF-0013 — minimal provider tenant defaults
+
+- Contract: the schema-aware provider one-shot must populate every required internal tenant field
+  without starting the full RAGFlow web application or initializing storage, retrieval or LLM
+  clients.
+- Enforcement: the command reads only `user_default_llm` metadata, resolves the same configured
+  model naming convention and supplies a non-empty parser default. Malformed configuration fails
+  closed with `PROVIDER_DEFAULTS_INVALID`; API keys are neither consumed nor retained.
+- Incident evidence: exact bundle `5abd2a143b0474c9812e8acc299285f87dc9e986` reached MySQL,
+  advisory lock, transaction, schema validation and an empty snapshot on target develop, but the
+  uninitialized CLI value `parser_ids=None` violated the non-null tenant schema. Both attempted
+  reconciliations rolled back completely and returned content-free
+  `CONFLICT/LOCK_OR_TRANSACTION_FAILURE`; no provider rows or readiness marker remained.
+- Tests: source commit `2c57368804e1a174c5f8cc28f1209593b55c2cbe`; all `20` focused
+  provider-identity tests and Ruff checks pass locally. Protected CI, rebuilt digest and target
+  clean-namespace bootstrap are pending.
+- Rollback: pin the prior exact bundle and keep the proxy non-ready. Do not initialize the full web
+  server from the one-shot or seed the missing tenant field through SQL.
 
 ## Qualification status
 
