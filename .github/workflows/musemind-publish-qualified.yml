@@ -1,4 +1,4 @@
-name: MuseMind mirror qualified image to develop
+name: MuseMind publish qualified image to GHCR
 
 on:
   workflow_dispatch:
@@ -7,17 +7,19 @@ permissions:
   contents: read
 
 jobs:
-  mirror-qualified-image:
+  publish-qualified-image:
     runs-on: ubuntu-24.04
     environment: develop
     permissions:
       contents: read
       id-token: write
-      packages: read
+      packages: write
     env:
       SOURCE_DIGEST: sha256:239c01eba318acc91c21ad527f85893e1dbe13f52c4ed564f0a3ec0759b8bb50
-      SOURCE_IMAGE: ghcr.io/museminds/ragflow
-      TARGET_REPOSITORY: musemind/develop/rag/ragflow
+      SOURCE_REPOSITORY: musemind/develop/rag/ragflow
+      SOURCE_TAG: qualified-239c01eba318
+      TARGET_IMAGE: ghcr.io/museminds/ragflow
+      TARGET_TAG: 5abd2a143b0474c9812e8acc299285f87dc9e986-linux-amd64
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@451ce2a72e8d729a59ebeaacab82dbce58e7af4c # v6
@@ -36,29 +38,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-      - name: Mirror the exact qualified manifest without rebuilding
+      - name: Publish the exact qualified manifest without rebuilding
         shell: bash
         run: |
-          source_ref="${SOURCE_IMAGE}@${SOURCE_DIGEST}"
-          target_tag="qualified-${SOURCE_DIGEST#sha256:}"
-          target_tag="${target_tag:0:22}"
-          target_ref="${{ steps.ecr.outputs.registry }}/${TARGET_REPOSITORY}:${target_tag}"
+          source_ref="${{ steps.ecr.outputs.registry }}/${SOURCE_REPOSITORY}@${SOURCE_DIGEST}"
+          target_ref="${TARGET_IMAGE}:${TARGET_TAG}"
 
-          docker buildx imagetools inspect "${source_ref}"
-          target_digest="$(aws ecr describe-images \
-            --repository-name "${TARGET_REPOSITORY}" \
-            --image-ids "imageTag=${target_tag}" \
+          source_digest="$(aws ecr describe-images \
+            --repository-name "${SOURCE_REPOSITORY}" \
+            --image-ids "imageTag=${SOURCE_TAG}" \
             --query 'imageDetails[0].imageDigest' \
-            --output text 2>/dev/null || true)"
-          if [[ -z "${target_digest}" || "${target_digest}" == "None" ]]; then
+            --output text)"
+          test "${source_digest}" = "${SOURCE_DIGEST}"
+          docker buildx imagetools inspect "${source_ref}"
+
+          if ! docker buildx imagetools inspect "${target_ref}" >/dev/null 2>&1; then
             docker buildx imagetools create --prefer-index=false --tag "${target_ref}" "${source_ref}"
-            target_digest="$(aws ecr describe-images \
-              --repository-name "${TARGET_REPOSITORY}" \
-              --image-ids "imageTag=${target_tag}" \
-              --query 'imageDetails[0].imageDigest' \
-              --output text)"
           fi
+
+          target_digest="$(docker buildx imagetools inspect "${target_ref}" |
+            awk '$1 == "Digest:" { print $2; exit }')"
           test "${target_digest}" = "${SOURCE_DIGEST}"
 
-          echo "### Develop RAGFlow mirror" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Source and ECR digest: \`${target_digest}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "### Qualified RAGFlow publication" >> "${GITHUB_STEP_SUMMARY}"
+          echo "ECR source and GHCR digest: \`${target_digest}\`" >> "${GITHUB_STEP_SUMMARY}"
