@@ -38,6 +38,7 @@ from rag.llm.embedding_model import (
     DEFAULT_MAX_TOKENS,
     BedrockEmbed,
     EmbeddingError,
+    JinaMultiVecEmbed,
     LocalAIEmbed,
     MistralEmbed,
     NvidiaEmbed,
@@ -341,6 +342,93 @@ class TestNvidiaInputType:
         with patch("rag.llm.embedding_model.requests.post", return_value=self._mock_resp()) as post:
             embed.encode_queries("a query")
         assert post.call_args.kwargs["json"]["input_type"] == "query"
+
+
+@pytest.mark.p1
+class TestMuseMindJinaV3Contract:
+    @staticmethod
+    def _response(indexes=(0,)):
+        response = MagicMock()
+        response.status_code = 200
+        vector = [0.0] * 1024
+        vector[0] = 1.0
+        response.json.return_value = {
+            "data": [
+                {"index": index, "embedding": vector}
+                for index in indexes
+            ],
+            "usage": {"total_tokens": len(indexes)},
+        }
+        return response
+
+    def test_passage_request_sends_every_output_affecting_v3_default(self):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3")
+        with patch("rag.llm.embedding_model.requests.post", return_value=self._response()) as post:
+            vectors, tokens = embed.encode(["Una sala del museo"])
+
+        assert vectors.shape == (1, 1024)
+        assert tokens == 1
+        assert post.call_args.kwargs["timeout"] == 30
+        assert post.call_args.kwargs["json"] == {
+            "model": "jina-embeddings-v3",
+            "input": ["Una sala del museo"],
+            "task": "retrieval.passage",
+            "truncate": True,
+            "normalized": True,
+            "embedding_type": "float",
+            "dimensions": 1024,
+            "late_chunking": False,
+        }
+
+    def test_query_uses_query_adapter_without_fallback(self):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3")
+        with patch("rag.llm.embedding_model.requests.post", return_value=self._response()) as post:
+            vector, _ = embed.encode_queries("Dove si trova il dipinto?")
+
+        assert vector.shape == (1024,)
+        assert post.call_args.kwargs["json"]["task"] == "retrieval.query"
+
+    @pytest.mark.parametrize(
+        "endpoint",
+        ["https://example.invalid/v1/embeddings", "http://api.jina.ai/v1/embeddings"],
+    )
+    def test_v3_endpoint_drift_fails_before_network(self, endpoint):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3", base_url=endpoint)
+        with patch("rag.llm.embedding_model.requests.post") as post:
+            with pytest.raises(EmbeddingError, match="endpoint differs"):
+                embed.encode(["testo"])
+        post.assert_not_called()
+
+    def test_binary_input_fails_closed_before_network(self):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3")
+        with patch("rag.llm.embedding_model.requests.post") as post:
+            with pytest.raises(EmbeddingError, match="text inputs only"):
+                embed.encode([b"not-text"])
+        post.assert_not_called()
+
+    def test_dimension_or_normalization_drift_fails_closed(self):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3")
+        bad_dimension = self._response()
+        bad_dimension.json.return_value["data"][0]["embedding"] = [1.0, 0.0]
+        with patch("rag.llm.embedding_model.requests.post", return_value=bad_dimension):
+            with pytest.raises(EmbeddingError, match="dimension"):
+                embed.encode(["testo"])
+
+        bad_norm = self._response()
+        bad_norm.json.return_value["data"][0]["embedding"][0] = 2.0
+        with patch("rag.llm.embedding_model.requests.post", return_value=bad_norm):
+            with pytest.raises(EmbeddingError, match="normalization"):
+                embed.encode(["testo"])
+
+    def test_http_failure_propagates_without_calling_another_embedder(self):
+        embed = JinaMultiVecEmbed("jina_secret", "jina-embeddings-v3")
+        response = MagicMock()
+        response.status_code = 429
+        response.text = '{"detail":"rate limited"}'
+        with patch("rag.llm.embedding_model.requests.post", return_value=response) as post:
+            with pytest.raises(ModelException, match="rate limited"):
+                embed.encode(["testo"])
+        assert post.call_count == 1
 
 
 @pytest.mark.p2

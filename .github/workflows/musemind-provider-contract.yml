@@ -144,6 +144,7 @@ jobs:
           tools/musemind_conformance/c05_parser_intake.py
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
+          tools/musemind_conformance/jina_generation.py
 
       - name: Lint MuseMind provider contract sources
         run: >-
@@ -172,9 +173,11 @@ jobs:
           test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
           test/unit_test/tools/test_musemind_exact_scope_conformance.py
+          test/unit_test/tools/musemind_conformance/test_jina_generation.py
           tools/musemind_conformance/c05_parser_intake.py
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
+          tools/musemind_conformance/jina_generation.py
 
       - name: Test remediated embedding provider contracts
         run: >-
@@ -196,7 +199,10 @@ jobs:
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_does_not_nest_connection_context_in_atomic
 
       - name: Test provider service-principal reconciliation
-        run: .venv/bin/pytest test/unit_test/api/db/test_musemind_provider_identity.py
+        run: >-
+          .venv/bin/pytest
+          test/unit_test/api/db/test_musemind_provider_identity.py
+          test/unit_test/tools/musemind_conformance/test_jina_generation.py
 
       - name: Test SDK timeout and exact wire contract
         run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
