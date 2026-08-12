@@ -330,19 +330,27 @@ test does not by itself qualify a runtime bundle.
 
 ## Patch MM-RF-0015 — API-first Jina v3 generation
 
-- Contract: ADR-0037's first `develop` candidate authorizes only `jina-embeddings-v3@Jina` for the
+- Contract: ADR-0037's first `develop` candidate authorizes only
+  `jina-embeddings-v3@musemind@Jina` for the
   non-human service tenant. The request sends the exact Jina endpoint, 1024 dimensions, query or
   passage task, normalized float output, truncation and disabled late chunking explicitly; inputs
   are text-only and no error path selects Builtin, TEI or another provider.
-- Credential lifecycle: the existing schema-aware one-shot also reconciles the tenant embedding
-  default and one exact `tenant_llm` authorization from a mounted Jina key. It repairs only an
-  unambiguous key/default rotation, emits a key fingerprint rather than the secret, and fails closed
-  on endpoint/model/status/row ambiguity. The permanent proxy receives neither MySQL nor the key.
+- Credential lifecycle: the schema-aware one-shot reconciles the tenant embedding default and one
+  deterministic provider/instance/model authorization in RAGFlow's current model store from a
+  mounted Jina key. A previous exact `tenant_llm` row is consumed and removed in the
+  same transaction that creates the current authorization; partial, duplicated or drifted rows
+  fail closed. It repairs only an unambiguous key/default rotation, emits a key fingerprint rather
+  than the secret, and never leaves two credential paths active. The permanent proxy receives
+  neither MySQL nor the key.
 - Drift/readiness: every live response must be finite, L2-normalized and exactly 1024-dimensional.
   The content-free synthetic Italian/multilingual probe exercises passage and query adapters and
   emits only vector fingerprints, aggregate cosine values and token counts for qualification and
   startup evidence. Numeric material-drift tolerance remains a qualification output before the
   candidate can become `QUALIFIED`.
+- Target finding: fresh C-04 preflights on deployed bundle `ee0d37a63â€¦` stopped before the first
+  dataset was created because the public dataset resolver could not see the exact authorization in
+  the superseded store (`code 102`, `Provider Jina not found`). The current-store reconciliation
+  above is the correction; the rejected attempts created no documents and are not C-04 evidence.
 - Tests/evidence: protected source commit `95c311e81ca2409ed38b1a214d894fae4bf59996`, PR `#33`,
   required runs `31534866305` and `31535100326`, exact local OCI manifest
   `sha256:66411ae4a6d29f2c6f82f2c415771458ad8a32c0849230304805c9377f31feb0`,

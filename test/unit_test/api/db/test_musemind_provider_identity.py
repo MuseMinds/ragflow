@@ -39,6 +39,7 @@ class MemoryStore:
         self.memberships: dict[str, MembershipState] = {}
         self.tokens: set[tuple[str, str]] = set()
         self.embedding_authorizations: dict[str, EmbeddingAuthorizationState] = {}
+        self.legacy_embedding_authorizations: dict[str, EmbeddingAuthorizationState] = {}
         self.lock = threading.Lock()
 
     @contextmanager
@@ -60,6 +61,7 @@ class MemoryStore:
             tenant_tokens=tenant_tokens,
             desired_token_owners=desired_token_owners,
             embedding_authorizations=tuple(self.embedding_authorizations.values()),
+            legacy_embedding_authorizations=tuple(self.legacy_embedding_authorizations.values()),
         )
 
     def create_user(self, spec: ProviderIdentitySpec) -> None:
@@ -84,14 +86,14 @@ class MemoryStore:
         self.tenants[spec.principal_id] = TenantState(
             id=spec.principal_id,
             name=spec.nickname,
-            embd_id="jina-embeddings-v3@Jina",
+            embd_id="jina-embeddings-v3@musemind@Jina",
             status="1",
         )
 
     def repair_tenant_embedding_default(self, spec: ProviderIdentitySpec) -> None:
         self.tenants[spec.principal_id] = replace(
             self.tenants[spec.principal_id],
-            embd_id="jina-embeddings-v3@Jina",
+            embd_id="jina-embeddings-v3@musemind@Jina",
         )
 
     def create_embedding_authorization(self, spec: ProviderIdentitySpec) -> None:
@@ -103,7 +105,7 @@ class MemoryStore:
             api_key=spec.jina_api_key,
             api_base="https://api.jina.ai/v1/embeddings",
             max_tokens=8192,
-            status="1",
+            status="active",
         )
 
     def rotate_embedding_credential(self, spec: ProviderIdentitySpec) -> None:
@@ -111,6 +113,9 @@ class MemoryStore:
             self.embedding_authorizations[spec.principal_id],
             api_key=spec.jina_api_key,
         )
+
+    def delete_legacy_embedding_authorization(self, spec: ProviderIdentitySpec) -> None:
+        self.legacy_embedding_authorizations.pop(spec.principal_id)
 
     def create_owner_membership(self, spec: ProviderIdentitySpec) -> None:
         self.memberships[spec.membership_id] = MembershipState(
@@ -147,10 +152,13 @@ def make_spec(
 
 
 def test_principal_id_is_stable_and_domain_scoped():
+    spec = make_spec()
     first = derive_principal_id(INSTANCE_ID, "develop")
     assert first == derive_principal_id(INSTANCE_ID.upper(), "DEVELOP")
     assert len(first) == 32
     assert first != derive_principal_id(INSTANCE_ID, "production")
+    assert len({spec.principal_id, spec.jina_provider_id, spec.jina_instance_id, spec.jina_model_id}) == 4
+    assert all(len(identifier) == 32 for identifier in (spec.jina_provider_id, spec.jina_instance_id, spec.jina_model_id))
 
 
 def test_provider_tenant_defaults_are_loaded_without_full_server_initialization():
@@ -196,6 +204,32 @@ def test_clean_create_then_second_run_is_unchanged():
     assert len(store.memberships) == len(store.tokens) == len(store.embedding_authorizations) == 1
 
 
+def test_exact_legacy_jina_authorization_is_migrated_to_current_store():
+    store = MemoryStore()
+    spec = make_spec()
+    reconcile_provider_identity(store, spec)
+    current = store.embedding_authorizations.pop(spec.principal_id)
+    store.legacy_embedding_authorizations[spec.principal_id] = replace(
+        current,
+        status="1",
+    )
+    store.tenants[spec.principal_id] = replace(
+        store.tenants[spec.principal_id],
+        embd_id="jina-embeddings-v3@Jina",
+    )
+
+    migrated = reconcile_provider_identity(store, spec)
+    unchanged = reconcile_provider_identity(store, spec)
+
+    assert migrated.outcome == "REPAIRED"
+    assert migrated.created_rows == 1
+    assert migrated.repaired_rows == 2
+    assert not store.legacy_embedding_authorizations
+    assert store.embedding_authorizations[spec.principal_id].api_key == JINA_API_KEY
+    assert store.tenants[spec.principal_id].embd_id == "jina-embeddings-v3@musemind@Jina"
+    assert unchanged.outcome == "UNCHANGED"
+
+
 def test_compatible_partial_state_is_repaired():
     store = MemoryStore()
     spec = make_spec()
@@ -237,7 +271,7 @@ def test_embedding_default_and_key_rotation_are_repaired_without_generation_chan
 
     assert repaired.outcome == "REPAIRED"
     assert repaired.repaired_rows == 2
-    assert store.tenants[spec.principal_id].embd_id == "jina-embeddings-v3@Jina"
+    assert store.tenants[spec.principal_id].embd_id == "jina-embeddings-v3@musemind@Jina"
     assert store.embedding_authorizations[spec.principal_id].api_key == ROTATED_JINA_API_KEY
     assert repaired.embedding_credential_fingerprint
 
