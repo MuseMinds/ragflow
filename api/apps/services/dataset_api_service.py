@@ -29,11 +29,17 @@ from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.connector_service import Connector2KbService
 from api.db.services.task_service import GRAPH_RAPTOR_FAKE_DOC_ID, TaskService
 from api.db.services.user_service import TenantService, UserService, UserTenantService
-from common.constants import FileSource, StatusEnum
+from common.constants import FileSource, LLMType, StatusEnum
 from api.utils.api_utils import deep_merge, get_parser_config, remap_dictionary_keys, verify_embedding_availability
+from api.utils.musemind_provider_contract import (
+    MUSEMIND_DATASET_PROJECTION_SCHEMA,
+    canonical_dataset_projection_bytes,
+    create_or_adopt_dataset_identity,
+)
 from common.misc_utils import thread_pool_exec
 
 _VALID_INDEX_TYPES = {"graph", "raptor", "mindmap", "artifact", "skill"}
+_MUSEMIND_DATASET_CONFIG_INVALID = "PROVIDER_DATASET_CONFIG_INVALID"
 
 _INDEX_TYPE_TO_TASK_TYPE = {
     "graph": "graphrag",
@@ -114,6 +120,76 @@ async def create_dataset(tenant_id: str, req: dict):
         return False, "Dataset created failed"
     response_data = remap_dictionary_keys(k.to_dict())
     return True, response_data
+
+
+def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection: dict) -> tuple[dict, dict, int]:
+    exists, tenant = TenantService.get_by_id(tenant_id)
+    if not exists or tenant.embd_id != projection["embd_id"] or tenant.tenant_embd_id is None:
+        raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
+
+    try:
+        get_model_config_from_provider_instance(tenant_id, LLMType.EMBEDDING, projection["embd_id"])
+    except Exception as exc:
+        raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID) from exc
+
+    parser_config = get_parser_config(projection["parser_id"], projection["parser_config"])
+    parser_config["llm_id"] = tenant.llm_id
+    payload = {
+        "id": dataset_id,
+        "name": f"mm-{dataset_id}",
+        "tenant_id": tenant_id,
+        "created_by": tenant_id,
+        "language": projection["language"],
+        "description": "",
+        "avatar": None,
+        "embd_id": projection["embd_id"],
+        "tenant_embd_id": tenant.tenant_embd_id,
+        "permission": "team",
+        "status": StatusEnum.VALID.value,
+        "parser_id": projection["parser_id"],
+        "parser_config": parser_config,
+        "similarity_threshold": projection["similarity_threshold"],
+        "vector_similarity_weight": projection["vector_similarity_weight"],
+        "pagerank": projection["pagerank"],
+        "pipeline_id": projection["pipeline_id"],
+    }
+    expected = {
+        "schema": MUSEMIND_DATASET_PROJECTION_SCHEMA,
+        "dataset_id": dataset_id,
+        "name": payload["name"],
+        "language": payload["language"],
+        "embd_id": payload["embd_id"],
+        "parser_id": payload["parser_id"],
+        "parser_config": payload["parser_config"],
+        "similarity_threshold": payload["similarity_threshold"],
+        "vector_similarity_weight": payload["vector_similarity_weight"],
+        "pagerank": payload["pagerank"],
+        "pipeline_id": payload["pipeline_id"],
+        "permission": payload["permission"],
+        "status": payload["status"],
+        "description": payload["description"],
+        "avatar": payload["avatar"],
+    }
+    canonical_dataset_projection_bytes(expected)
+    return payload, expected, tenant.tenant_embd_id
+
+
+def create_or_adopt_musemind_dataset(tenant_id: str, req: dict):
+    """Create or adopt exactly one MuseMind-owned dataset identity."""
+    dataset_id = req["dataset_id"]
+    try:
+        payload, expected, expected_tenant_embd_id = _prepare_musemind_dataset_insert(tenant_id, dataset_id, req["provider_projection"])
+    except ValueError:
+        return False, _MUSEMIND_DATASET_CONFIG_INVALID
+
+    return create_or_adopt_dataset_identity(
+        dataset_id=dataset_id,
+        payload=payload,
+        expected_projection=expected,
+        expected_tenant_embd_id=expected_tenant_embd_id,
+        insert=lambda exact_payload: KnowledgebaseService.save(**exact_payload),
+        read_for_authenticated_tenant=lambda exact_id: KnowledgebaseService.get_or_none(id=exact_id, tenant_id=tenant_id),
+    )
 
 
 async def delete_datasets(tenant_id: str, ids: list = None, delete_all: bool = False):

@@ -367,6 +367,29 @@ test does not by itself qualify a runtime bundle.
   rollback uses the secret/one-shot lifecycle and does not mutate generation identity; never fall
   back automatically to TEI or another embedding model.
 
+## Patch MM-RF-0016 — deterministic dataset create-or-adopt
+
+- Contract: ADR-0039 adds the dedicated authenticated `POST /datasets/musemind/exact` route and
+  SDK method. MuseMind supplies only a PostgreSQL-derived 32-lowercase-hex dataset ID and the
+  strict `musemind.ragflow-dataset-provider-projection/v1`; generic dataset creation remains
+  unchanged and does not accept a caller-selected ID.
+- Authority and isolation: the route derives opaque name, authenticated tenant/creator,
+  `permission=team`, valid status, parser defaults/tenant LLM and the tenant-local embedding
+  surrogate. It validates the complete request before mutation, performs one exact-ID
+  `knowledgebase` insert and treats only a duplicate `PRIMARY` key as a concurrent retry. Adoption
+  reads by exact `(id, authenticated tenant)` and wrong tenant/config returns the indistinguishable
+  `PROVIDER_DATASET_IDENTITY_COLLISION` without overwrite, list/name adoption or metadata disclosure.
+- Canonical equality: normalized provider projection equality uses RFC 8785/JCS. Provider counters,
+  timestamps/task state and the rebuild-local numeric embedding surrogate are excluded; the
+  surrogate remains tenant/model-authorized. Pipeline mode is explicitly off for the pilot.
+- Tests/evidence: focused request, service, fault-classification and SDK tests accompany the patch.
+  A clean immutable image and full C-01–C-09 qualification are required; no evidence from the
+  previous digest transfers. Exact commit, image digest and run identifiers remain pending until
+  the protected PR and qualification workflow complete.
+- Rollback: fence publication/materialization and restore the prior qualified image. Existing
+  PostgreSQL dataset identities remain authoritative but no new dataset is created until an exact
+  create-or-adopt capable image is restored. Never fall back to name/list or direct MySQL.
+
 ## Qualification status
 
 | Evidence | Status |

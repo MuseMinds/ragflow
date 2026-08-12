@@ -130,8 +130,10 @@ jobs:
         run: >-
           .venv/bin/python -m compileall -q
           api/apps/__init__.py
+          api/apps/restful_apis/dataset_api.py
           api/apps/restful_apis/chunk_api.py
           api/apps/restful_apis/document_api.py
+          api/apps/services/dataset_api_service.py
           api/db/musemind_provider_identity.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
@@ -152,8 +154,10 @@ jobs:
         run: >-
           uvx --from ruff==0.16.0 ruff check --select E9,F
           api/apps/__init__.py
+          api/apps/restful_apis/dataset_api.py
           api/apps/restful_apis/chunk_api.py
           api/apps/restful_apis/document_api.py
+          api/apps/services/dataset_api_service.py
           api/db/musemind_provider_identity.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
@@ -167,11 +171,13 @@ jobs:
           sdk/python/ragflow_sdk/ragflow.py
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py
           test/unit_test/api/apps/test_auth_logging_contract.py
+          test/unit_test/api/apps/services/test_musemind_dataset_create_adopt.py
           test/unit_test/api/db/test_musemind_provider_identity.py
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
           test/unit_test/sdk/test_ragflow_request_timeout.py
+          test/unit_test/sdk/test_musemind_exact_dataset_contract.py
           test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
           test/unit_test/tools/test_musemind_exact_scope_conformance.py
@@ -195,6 +201,7 @@ jobs:
         run: >-
           .venv/bin/pytest
           test/unit_test/api/utils/test_musemind_provider_contract.py
+          test/unit_test/api/apps/services/test_musemind_dataset_create_adopt.py
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
@@ -207,7 +214,10 @@ jobs:
           test/unit_test/tools/musemind_conformance/test_jina_generation.py
 
       - name: Test SDK timeout and exact wire contract
-        run: .venv/bin/pytest test/unit_test/sdk/test_ragflow_request_timeout.py
+        run: >-
+          .venv/bin/pytest
+          test/unit_test/sdk/test_ragflow_request_timeout.py
+          test/unit_test/sdk/test_musemind_exact_dataset_contract.py
 
       - name: Test MinIO exact-prefix connector contract
         run: >-

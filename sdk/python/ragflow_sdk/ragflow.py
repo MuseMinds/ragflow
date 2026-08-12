@@ -15,6 +15,8 @@
 
 from typing import Optional, Any
 
+import re
+
 import requests
 
 from .modules.agent import Agent
@@ -93,6 +95,40 @@ class RAGFlow:
         if res.get("code") == 0:
             return DataSet(self, res["data"])
         raise Exception(res["message"])
+
+    def create_or_adopt_dataset_exact(self, dataset_id: str, provider_projection: dict[str, Any]) -> dict[str, Any]:
+        """Create or adopt the exact MuseMind dataset identity."""
+        if re.fullmatch(r"[0-9a-f]{32}", dataset_id) is None:
+            raise ValueError("dataset_id must be 32 lowercase hexadecimal characters")
+        required = {
+            "language",
+            "embd_id",
+            "parser_id",
+            "parser_config",
+            "similarity_threshold",
+            "vector_similarity_weight",
+            "pagerank",
+            "pipeline_id",
+        }
+        if set(provider_projection) != required:
+            raise ValueError("provider_projection must contain the exact v1 field set")
+        if provider_projection.get("pipeline_id") is not None:
+            raise ValueError("pipeline_id must be null for the MuseMind pilot")
+
+        response = self.post(
+            "/datasets/musemind/exact",
+            {
+                "schema": "musemind.ragflow-dataset-create-or-adopt/v1",
+                "dataset_id": dataset_id,
+                "provider_projection": provider_projection,
+            },
+        ).json()
+        if response.get("code") != 0:
+            raise Exception(response.get("message"))
+        result = response.get("data") or {}
+        if result.get("dataset_id") != dataset_id or result.get("outcome") not in {"CREATED", "ADOPTED"}:
+            raise Exception("provider returned an incoherent exact dataset identity")
+        return result
 
     def delete_datasets(self, ids: list[str] | None = None, delete_all: bool = False):
         res = self.delete("/datasets", {"ids": ids, "delete_all": delete_all})
