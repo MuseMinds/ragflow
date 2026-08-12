@@ -7838,6 +7838,7 @@ dependencies = [
     { name = "readability-lxml" },
     { name = "replicate" },
     { name = "reportlab" },
+    { name = "rfc8785" },
     { name = "roman-numbers" },
     { name = "ruamel-base" },
     { name = "ruamel-yaml" },
@@ -7992,6 +7993,7 @@ requires-dist = [
     { name = "readability-lxml", specifier = ">=0.8.4,<1.0.0" },
     { name = "replicate", specifier = "==0.31.0" },
     { name = "reportlab", specifier = ">=4.4.1" },
+    { name = "rfc8785", specifier = "==0.1.4" },
     { name = "roman-numbers", specifier = "==1.0.2" },
     { name = "ruamel-base", specifier = "==1.0.0" },
     { name = "ruamel-yaml", specifier = ">=0.18.6,<0.19.0" },
@@ -8239,6 +8241,15 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/9d/72/75d0b85443fbc8d9f38d08d2b1b67cc184ce35280e4a3813cda2f445f3a4/retry-0.9.2.tar.gz", hash = "sha256:f8bfa8b99b69c4506d6f5bd3b0aabf77f98cdb17f3c9fc3f5ca820033336fba4" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/4b/0d/53aea75710af4528a25ed6837d71d117602b01946b307a3912cb3cfcbcba/retry-0.9.2-py2.py3-none-any.whl", hash = "sha256:ccddf89761fa2c726ab29391837d4327f819ea14d244c232a1d24c67a2f98606" },
+]
+
+[[package]]
+name = "rfc8785"
+version = "0.1.4"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/ef/2f/fa1d2e740c490191b572d33dbca5daa180cb423c24396b856f5886371d8b/rfc8785-0.1.4.tar.gz", hash = "sha256:e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/4d/78/119878110660b2ad709888c8a1614fce7e2fab39080ab960656dc8605bf6/rfc8785-0.1.4-py3-none-any.whl", hash = "sha256:520d690b448ecf0703691c76e1a34a24ddcd4fc5bc41d589cb7c58ec651bcd48" },
 ]
 
 [[package]]

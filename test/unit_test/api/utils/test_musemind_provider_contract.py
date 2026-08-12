@@ -16,8 +16,15 @@
 from types import SimpleNamespace
 
 import pytest
+from peewee import IntegrityError
+from pydantic import ValidationError
 
-from api.utils.musemind_provider_contract import prepare_exact_document_upload
+from api.utils.musemind_provider_contract import (
+    MuseMindDatasetCreateOrAdoptV1,
+    canonical_dataset_projection_bytes,
+    is_knowledgebase_primary_key_conflict,
+    prepare_exact_document_upload,
+)
 
 
 def test_prepare_exact_document_upload_makes_identity_opaque_and_create_only():
@@ -54,3 +61,61 @@ def test_prepare_exact_document_upload_preserves_legacy_uploads():
     assert prepare_exact_document_upload([upload], "") is False
     assert upload.filename == "original.txt"
     assert not hasattr(upload, "id")
+
+
+def _dataset_request(**overrides):
+    request = {
+        "schema": "musemind.ragflow-dataset-create-or-adopt/v1",
+        "dataset_id": "0123456789abcdef0123456789abcdef",
+        "provider_projection": {
+            "language": "Italian",
+            "embd_id": "jina-embeddings-v3@musemind@Jina",
+            "parser_id": "naive",
+            "parser_config": {},
+            "similarity_threshold": 0.2,
+            "vector_similarity_weight": 0.3,
+            "pagerank": 0,
+            "pipeline_id": None,
+        },
+    }
+    request.update(overrides)
+    return request
+
+
+def test_exact_dataset_request_is_strict_and_expands_parser_defaults():
+    model = MuseMindDatasetCreateOrAdoptV1(**_dataset_request())
+
+    assert model.dataset_id == "0123456789abcdef0123456789abcdef"
+    assert model.provider_projection.parser_config.chunk_token_num == 512
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda request: request.update(dataset_id="0123456789ABCDEF0123456789ABCDEF"),
+        lambda request: request.update(extra="forbidden"),
+        lambda request: request["provider_projection"].pop("pipeline_id"),
+        lambda request: request["provider_projection"].update(pipeline_id="0" * 32),
+        lambda request: request["provider_projection"].update(similarity_threshold=float("nan")),
+        lambda request: request["provider_projection"].update(parser_config={"llm_id": "caller-controlled"}),
+    ],
+)
+def test_exact_dataset_request_rejects_invalid_or_ambiguous_fields(mutate):
+    request = _dataset_request()
+    mutate(request)
+
+    with pytest.raises(ValidationError):
+        MuseMindDatasetCreateOrAdoptV1(**request)
+
+
+def test_dataset_projection_uses_canonical_key_order():
+    left = {"schema": "v1", "nested": {"b": 2, "a": 1}}
+    right = {"nested": {"a": 1, "b": 2}, "schema": "v1"}
+
+    assert canonical_dataset_projection_bytes(left) == canonical_dataset_projection_bytes(right)
+
+
+def test_only_mysql_primary_key_duplicate_is_adoptable():
+    assert is_knowledgebase_primary_key_conflict(IntegrityError(1062, "Duplicate entry 'id' for key 'PRIMARY'"))
+    assert not is_knowledgebase_primary_key_conflict(IntegrityError(1062, "Duplicate entry 'name' for key 'idx_name'"))
+    assert not is_knowledgebase_primary_key_conflict(IntegrityError(1205, "Lock wait timeout"))

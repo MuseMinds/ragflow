@@ -367,6 +367,30 @@ test does not by itself qualify a runtime bundle.
   rollback uses the secret/one-shot lifecycle and does not mutate generation identity; never fall
   back automatically to TEI or another embedding model.
 
+## Patch MM-RF-0016 — deterministic dataset create-or-adopt
+
+- Contract: ADR-0039 adds the dedicated authenticated `POST /datasets/musemind/exact` route and
+  SDK method. MuseMind supplies only a PostgreSQL-derived 32-lowercase-hex dataset ID and the
+  strict `musemind.ragflow-dataset-provider-projection/v1`; generic dataset creation remains
+  unchanged and does not accept a caller-selected ID.
+- Authority and isolation: the route derives opaque name, authenticated tenant/creator,
+  `permission=team`, valid status, parser defaults/tenant LLM and the tenant-local embedding
+  surrogate. It validates the complete request before mutation, performs one exact-ID
+  `knowledgebase` insert and treats only a duplicate `PRIMARY` key as a concurrent retry. Adoption
+  reads by exact `(id, authenticated tenant)` and wrong tenant/config returns the indistinguishable
+  `PROVIDER_DATASET_IDENTITY_COLLISION` without overwrite, list/name adoption or metadata disclosure.
+- Canonical equality: normalized provider projection equality uses RFC 8785/JCS. Provider counters,
+  timestamps/task state and the rebuild-local numeric embedding surrogate are excluded; the
+  surrogate remains tenant/model-authorized. Pipeline mode is explicitly off for the pilot.
+- Tests/evidence: source commit `5bf2430e450e28b7ac821c002e7e6b5ec74f5ad5`; `24` focused
+  request/service/fault-classification/SDK tests plus `12` existing upload/auth/timeout regressions
+  pass on Python 3.13.14, together with compile, Ruff and diff checks. A clean immutable image and
+  full C-01–C-09 qualification are required; no evidence from the previous digest transfers.
+  Protected-PR run, merge commit, image digest and live qualification identifiers remain pending.
+- Rollback: fence publication/materialization and restore the prior qualified image. Existing
+  PostgreSQL dataset identities remain authoritative but no new dataset is created until an exact
+  create-or-adopt capable image is restored. Never fall back to name/list or direct MySQL.
+
 ## Qualification status
 
 | Evidence | Status |

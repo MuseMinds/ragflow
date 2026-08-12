@@ -17,9 +17,11 @@ import logging
 
 from peewee import OperationalError
 from quart import request
-from common.constants import RetCode
-from api.apps import login_required, current_user
-from api.utils.api_utils import get_error_argument_result, get_error_data_result, get_json_result, get_result, add_tenant_id_to_kwargs
+
+from api.apps import current_user, login_required
+from api.apps.services import dataset_api_service
+from api.utils.api_utils import add_tenant_id_to_kwargs, get_error_argument_result, get_error_data_result, get_json_result, get_result
+from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV1
 from api.utils.pagination_utils import validate_rest_api_page_size
 from api.utils.validation_utils import (
     CreateDatasetReq,
@@ -31,7 +33,32 @@ from api.utils.validation_utils import (
     validate_and_parse_json_request,
     validate_and_parse_request_args,
 )
-from api.apps.services import dataset_api_service
+from common.constants import RetCode
+
+logger = logging.getLogger(__name__)
+
+
+@manager.route("/datasets/musemind/exact", methods=["POST"])  # noqa: F821
+@login_required
+@add_tenant_id_to_kwargs
+async def create_or_adopt_musemind_exact_dataset(tenant_id: str | None = None):
+    """Create or adopt a PostgreSQL-derived MuseMind dataset identity."""
+    req, err = await validate_and_parse_json_request(request, MuseMindDatasetCreateOrAdoptV1)
+    if err is not None:
+        return get_error_argument_result(err)
+
+    try:
+        if not tenant_id:
+            tenant_id = current_user.id
+        success, result = dataset_api_service.create_or_adopt_musemind_dataset(tenant_id, req)
+        if success:
+            return get_result(data=result)
+        return get_error_data_result(message=result)
+    except OperationalError:
+        return get_error_data_result(message="Database operation failed")
+    except Exception:
+        logger.exception("MuseMind exact dataset create-or-adopt failed")
+        return get_error_data_result(message="Internal server error")
 
 
 @manager.route("/datasets/tags/aggregation", methods=["GET"])  # noqa: F821
