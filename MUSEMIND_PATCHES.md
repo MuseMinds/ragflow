@@ -343,8 +343,16 @@ test does not by itself qualify a runtime bundle.
   emits only vector fingerprints, aggregate cosine values and token counts for qualification and
   startup evidence. Numeric material-drift tolerance remains a qualification output before the
   candidate can become `QUALIFIED`.
-- Tests/evidence: source commit, PR, CI, exact OCI digest, live probe, C-01/C-04/C-05/C-06/C-08/C-09
-  and new generation JCS are `PENDING`. Historical BGE/TEI generation evidence is not relabelled.
+- Tests/evidence: protected source commit `95c311e81ca2409ed38b1a214d894fae4bf59996`, PR `#33`,
+  required runs `31534866305` and `31535100326`, exact local OCI manifest
+  `sha256:66411ae4a6d29f2c6f82f2c415771458ad8a32c0849230304805c9377f31feb0`,
+  config `sha256:c938def30f43f4ce7c3262448b87c3523482a46d58e58c6d8a8b756ea05be0c2`,
+  embedded SDK SHA-256 `da45bee30e2f8d6395cdbd31bd7b16962aa2348852c939ac6efd3e8124129e9c`
+  and generation JCS `b2f99fb1ddb8cc94dbc9bb583ce9f879779ed66c2d30d6dbdad12a9c89c96860`
+  are recorded by Architecture Evidence 0030. Review 0042 closes the exact stateful-risk stop;
+  C-01 remains pending until byte-identical immutable registry publication is verified. Live probe
+  and C-04/C-05/C-06/C-08/C-09 reruns remain pending. Historical BGE/TEI generation evidence is
+  not relabelled.
 - Rollback: fence the candidate and restore a previously qualified immutable generation. A key
   rollback uses the secret/one-shot lifecycle and does not mutate generation identity; never fall
   back automatically to TEI or another embedding model.
