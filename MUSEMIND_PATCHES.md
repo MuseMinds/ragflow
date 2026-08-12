@@ -382,10 +382,11 @@ test does not by itself qualify a runtime bundle.
 - Canonical equality: normalized provider projection equality uses RFC 8785/JCS. Provider counters,
   timestamps/task state and the rebuild-local numeric embedding surrogate are excluded; the
   surrogate remains tenant/model-authorized. Pipeline mode is explicitly off for the pilot.
-- Tests/evidence: focused request, service, fault-classification and SDK tests accompany the patch.
-  A clean immutable image and full C-01–C-09 qualification are required; no evidence from the
-  previous digest transfers. Exact commit, image digest and run identifiers remain pending until
-  the protected PR and qualification workflow complete.
+- Tests/evidence: source commit `5bf2430e450e28b7ac821c002e7e6b5ec74f5ad5`; `24` focused
+  request/service/fault-classification/SDK tests plus `12` existing upload/auth/timeout regressions
+  pass on Python 3.13.14, together with compile, Ruff and diff checks. A clean immutable image and
+  full C-01–C-09 qualification are required; no evidence from the previous digest transfers.
+  Protected-PR run, merge commit, image digest and live qualification identifiers remain pending.
 - Rollback: fence publication/materialization and restore the prior qualified image. Existing
   PostgreSQL dataset identities remain authoritative but no new dataset is created until an exact
   create-or-adopt capable image is restored. Never fall back to name/list or direct MySQL.
