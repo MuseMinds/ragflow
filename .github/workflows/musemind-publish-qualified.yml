@@ -15,11 +15,11 @@ jobs:
       id-token: write
       packages: write
     env:
-      SOURCE_DIGEST: sha256:66411ae4a6d29f2c6f82f2c415771458ad8a32c0849230304805c9377f31feb0
+      SOURCE_DIGEST: sha256:b152f7c2415d750aad3128fb24f5a997ddad8daaadd04dfcbed15576d4377b93
       SOURCE_REPOSITORY: musemind/develop/rag/ragflow
-      SOURCE_TAG: qualified-66411ae4a6d2
+      SOURCE_TAG: qualified-b152f7c2415d
       TARGET_IMAGE: ghcr.io/museminds/ragflow
-      TARGET_TAG: 95c311e81ca2409ed38b1a214d894fae4bf59996-linux-amd64
+      TARGET_TAG: ee0d37a63cfebd382b5b6487c8befffd011075c2-linux-amd64
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@451ce2a72e8d729a59ebeaacab82dbce58e7af4c # v6
