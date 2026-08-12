@@ -385,8 +385,12 @@ test does not by itself qualify a runtime bundle.
 - Tests/evidence: source commit `5bf2430e450e28b7ac821c002e7e6b5ec74f5ad5`; `24` focused
   request/service/fault-classification/SDK tests plus `12` existing upload/auth/timeout regressions
   pass on Python 3.13.14, together with compile, Ruff and diff checks. A clean immutable image and
-  full C-01–C-09 qualification are required; no evidence from the previous digest transfers.
-  Protected-PR run, merge commit, image digest and live qualification identifiers remain pending.
+  full C-01–C-09 qualification are required; no evidence from the previous digest transfers. PR
+  `MuseMinds/ragflow#40` passed required run `31632169393` and merged as
+  `4de6165a3c7d33506c149117c365223627c40e4f`. A bounded-download CI follow-up in PR `#41` passed
+  run `31633453810`, merged as `a125b4729cbe425f82a6dbeaf5c9941120514d21`, and the protected
+  `musemind` run `31634229009` passed. Image digest and live qualification identifiers remain
+  pending.
 - Rollback: fence publication/materialization and restore the prior qualified image. Existing
   PostgreSQL dataset identities remain authoritative but no new dataset is created until an exact
   create-or-adopt capable image is restored. Never fall back to name/list or direct MySQL.
