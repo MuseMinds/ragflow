@@ -98,6 +98,23 @@ def test_exact_dataset_primary_key_race_adopts_same_projection():
     assert result["outcome"] == "ADOPTED"
 
 
+def test_exact_dataset_current_registry_adopts_with_null_legacy_surrogate():
+    def duplicate(_payload):
+        raise IntegrityError(1062, "Duplicate entry 'id' for key 'PRIMARY'")
+
+    success, result = create_or_adopt_dataset_identity(
+        dataset_id=DATASET_ID,
+        payload={"id": DATASET_ID, "tenant_embd_id": None},
+        expected_projection=_expected(),
+        expected_tenant_embd_id=None,
+        insert=duplicate,
+        read_for_authenticated_tenant=lambda _dataset_id: _dataset(tenant_embd_id=None),
+    )
+
+    assert success is True
+    assert result["outcome"] == "ADOPTED"
+
+
 @pytest.mark.parametrize("existing", [None, _dataset(parser_id="book"), _dataset(tenant_embd_id=99)])
 def test_exact_dataset_collision_is_indistinguishable(existing):
     def duplicate(_payload):

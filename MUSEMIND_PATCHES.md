@@ -400,6 +400,27 @@ test does not by itself qualify a runtime bundle.
   PostgreSQL dataset identities remain authoritative but no new dataset is created until an exact
   create-or-adopt capable image is restored. Never fall back to name/list or direct MySQL.
 
+## Patch MM-RF-0017 — current-registry exact dataset authorization
+
+- Contract: the 2026-08-13 ADR-0039 clarification makes ADR-0037's
+  `tenant_model_provider`/`tenant_model_instance`/`tenant_model` registry the only embedding
+  authorization path for MM-RF-0016. The exact tenant default and requested composite `embd_id`
+  must match and resolve there before create or adopt.
+- Legacy-field handling: `tenant.tenant_embd_id` and `knowledgebase.tenant_embd_id` are retired
+  nullable integer references to the removed `tenant_llm` store. The exact route persists and
+  readbacks null; it never hashes/casts a string registry ID, recreates a compatibility row or
+  restores a second credential path.
+- Incident evidence: the first live MM-RF-0016 preflight on source `d8ba5c612…`, manifest
+  `sha256:5e16419f70b7…` and candidate generation JCS `5609a0831acf…` failed before mutation with
+  `PROVIDER_DATASET_CONFIG_INVALID` because MM-RF-0016 required the null legacy integer. No dataset
+  was created/adopted and no candidate/default was promoted.
+- Tests: current-registry resolution, null-field create/adopt and missing-authorization pre-insert
+  rejection are required alongside the existing collision/concurrency contract. The qualification
+  loop follows the accepted impact-manifest policy; one complete C-01–C-09 run remains mandatory
+  after the corrected release candidate is frozen.
+- Rollback: keep consumer/default fenced and restore the previous image. Never repair availability
+  by recreating `tenant_llm`, inventing a numeric surrogate or bypassing current-registry lookup.
+
 ## Qualification status
 
 | Evidence | Status |

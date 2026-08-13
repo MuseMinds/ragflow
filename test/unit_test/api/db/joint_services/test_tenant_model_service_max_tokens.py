@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from common.constants import ActiveStatusEnum
+from common.constants import ActiveStatusEnum, LLMType
 from api.db.joint_services import tenant_model_service as tms
 
 
@@ -116,3 +116,52 @@ def test_max_tokens_prefers_model_extra_over_factory(monkeypatch):
     config = tms.get_model_config_from_provider_instance("tenant-1", "chat", "gpt-test@default@OpenAI")
 
     assert config["max_tokens"] == 32000
+
+
+@pytest.mark.p1
+def test_jina_current_registry_resolves_exact_musemind_coordinate(monkeypatch):
+    provider = SimpleNamespace(id="provider-1", provider_name="Jina")
+    instance = SimpleNamespace(
+        id="instance-1",
+        api_key="jina_test",
+        extra='{"base_url": "https://api.jina.ai/v1/embeddings"}',
+    )
+    model = SimpleNamespace(
+        model_name="jina-embeddings-v3",
+        model_type="embedding",
+        status=ActiveStatusEnum.ACTIVE.value,
+        extra='{"is_tools": false, "max_tokens": 8192}',
+    )
+
+    monkeypatch.setattr(
+        tms.TenantModelProviderService,
+        "get_by_tenant_id_and_provider_name",
+        lambda tenant_id, provider_name: provider,
+    )
+    monkeypatch.setattr(
+        tms.TenantModelInstanceService,
+        "get_by_provider_id_and_instance_name",
+        lambda provider_id, instance_name: instance,
+    )
+    monkeypatch.setattr(
+        tms.TenantModelService,
+        "get_by_provider_id_and_instance_id_and_model_type_and_model_name",
+        lambda provider_id, instance_id, model_type, model_name: model,
+    )
+    monkeypatch.setattr(tms.settings, "FACTORY_LLM_INFOS", [])
+
+    config = tms.get_model_config_from_provider_instance(
+        "tenant-1",
+        LLMType.EMBEDDING,
+        "jina-embeddings-v3@musemind@Jina",
+    )
+
+    assert config == {
+        "llm_factory": "Jina",
+        "api_key": "jina_test",
+        "llm_name": "jina-embeddings-v3",
+        "api_base": "https://api.jina.ai/v1/embeddings",
+        "model_type": "embedding",
+        "is_tools": False,
+        "max_tokens": 8192,
+    }

@@ -177,6 +177,8 @@ jobs:
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/apps/services/test_musemind_dataset_create_adopt.py
+          test/unit_test/api/apps/services/test_musemind_dataset_current_registry.py
+          test/unit_test/api/db/joint_services/test_tenant_model_service_max_tokens.py
           test/unit_test/api/db/test_musemind_provider_identity.py
           test/unit_test/api/db/services/test_file_service_upload_document.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
@@ -207,6 +209,8 @@ jobs:
           .venv/bin/pytest
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/api/apps/services/test_musemind_dataset_create_adopt.py
+          test/unit_test/api/apps/services/test_musemind_dataset_current_registry.py
+          test/unit_test/api/db/joint_services/test_tenant_model_service_max_tokens.py
           test/unit_test/api/apps/test_auth_logging_contract.py
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_skips_cross_kb_document_id_collision
           test/unit_test/api/db/services/test_file_service_upload_document.py::test_upload_document_create_only_never_reads_or_overwrites_existing_id
