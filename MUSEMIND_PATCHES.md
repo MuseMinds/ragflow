@@ -1,7 +1,7 @@
 # MuseMind patch ledger
 
 This ledger is part of the immutable RAGFlow bundle evidence required by MuseMind ADR-0032. A
-qualification artifact must replace every `PENDING` value below with the exact merged fork commit,
+qualification artifact must replace every unresolved value below with the exact merged fork commit,
 OCI/SDK digest, test result and date that were actually exercised. A source diff or successful unit
 test does not by itself qualify a runtime bundle.
 
@@ -48,8 +48,9 @@ test does not by itself qualify a runtime bundle.
 - Merged provider service-principal bootstrap commit: `a7c7f5f14489f94dc4f7ac8c3eb53ca7d3ca4fa1`
 - Provider bootstrap tenant-default fix source: `2c57368804e1a174c5f8cc28f1209593b55c2cbe`
 - Fail-closed build version fix source: `759d6c4c2414d5afdbdf05acda8453c966297793`
-- Fully qualified fork commit: `PENDING`; C-01 and local C-02–C-09 passed, but C-07M target
-  EC2/EBS stop/start remains a separate deployment qualification
+- Fully qualified application commit: `90eb476a92f707bc72f14b19ab11a6ad80ba827f`; C-01-C-09
+  and target EC2/EBS dirty/clean restart qualification passed on 2026-08-13
+- Qualification publication workflow commit: `134cbcd56aca3de1618e7d31462bf5c4bb7c1aa3`
 - Upstream PRs: none opened; runtime patches are MuseMind-specific and qualification harnesses do
   not change served behavior
 
@@ -85,7 +86,8 @@ test does not by itself qualify a runtime bundle.
   concurrency claim. The exact `b829c6809…` rebuilt/published rerun passed every create/adopt,
   collision and parse-terminal case, then exposed a harness-only `page_size=1000` chunk read-back
   against the live API maximum `100`; source fix `eeb4fa0a5…` and a wire regression are merged by
-  PR `MuseMinds/ragflow#15`. A new protected-digest rerun remains `PENDING`.
+  PR `MuseMinds/ragflow#15`. Final frozen-candidate C-04 passed `30/30`; result SHA-256
+  `554d5d25cf8289930dc291077a7b6f085864e76e4ba51e1bdc48c88bc227cc99`.
 - Rollback: pin the previous qualified bundle and stop new materialization. Do not delete or choose
   an existing document by filename/list order.
 
@@ -95,8 +97,8 @@ test does not by itself qualify a runtime bundle.
   an explicit configurable connect/read timeout.
 - Enforcement: SDK default is `(5 s connect, 60 s read)` and may be overridden by operational
   configuration; timeout does not accept partial output as READY.
-- Tests: focused SDK timeout test implemented; content-canary scan and proxy/network matrix C-06
-  `PENDING`.
+- Tests: focused SDK timeout test implemented; final content-canary C-05 passed `14/14`, and C-06
+  wrong-key and untrusted-CA probes failed closed.
 - Rollback: pin the previous qualified bundle only if its log/timeout behavior has independently
   passed the same hardening evidence; otherwise disable the affected workload.
 
@@ -261,7 +263,8 @@ test does not by itself qualify a runtime bundle.
 - Tests: deterministic identity, clean create/idempotency, compatible repair, fail-closed conflicts,
   concurrent reconciliation, content-free output and add/smoke/revoke/rollback are covered by 16
   focused unit tests. Required CI passed in PR run `31481057849` and protected-branch run
-  `31481235029`; live clean-namespace qualification is `PENDING`.
+  `31481235029`; final target reconciliation returned content-free `UNCHANGED` before and after
+  restart qualification.
 - Rollback: pin the prior qualified bundle and keep the proxy non-ready. Do not seed or edit MySQL
   manually, create a replacement human principal or grant the permanent proxy database access.
 
@@ -303,7 +306,7 @@ test does not by itself qualify a runtime bundle.
 - Tests: source commit `2c57368804e1a174c5f8cc28f1209593b55c2cbe`; all `20` focused
   provider-identity tests and Ruff checks pass locally. PR `MuseMinds/ragflow#29` passed required
   run `31502008323` and protected run `31502204693`. Exact rebuilt bundle qualification is recorded
-  below; target clean-namespace bootstrap remains pending.
+  below; target clean-namespace bootstrap and post-restart readback passed.
 - Rollback: pin the prior exact bundle and keep the proxy non-ready. Do not initialize the full web
   server from the one-shot or seed the missing tenant field through SQL.
 
@@ -360,9 +363,9 @@ test does not by itself qualify a runtime bundle.
   are recorded by Architecture Evidence 0030. Review 0042 closes the exact stateful-risk stop.
   Protected workflow commit `afa9cc9fa81c2e48b29886ee6da40f397ee62b7f`, publication run
   `31577246409`, private GHCR package version `1124214748` and idempotent mirror run `31577429006`
-  verify byte-identical immutable publication, so C-01 passes with that bounded acceptance. Live
-  probe and C-04/C-05/C-06/C-08/C-09 reruns remain pending. Historical BGE/TEI generation evidence
-  is not relabelled.
+  verify byte-identical immutable publication, so C-01 passes with that bounded acceptance. The
+  final MM-RF-0017 candidate reran the live probe and C-04/C-05/C-06/C-08/C-09 successfully.
+  Historical BGE/TEI generation evidence is not relabelled.
 - Rollback: fence the candidate and restore a previously qualified immutable generation. A key
   rollback uses the secret/one-shot lifecycle and does not mutate generation identity; never fall
   back automatically to TEI or another embedding model.
@@ -415,9 +418,28 @@ test does not by itself qualify a runtime bundle.
   `PROVIDER_DATASET_CONFIG_INVALID` because MM-RF-0016 required the null legacy integer. No dataset
   was created/adopted and no candidate/default was promoted.
 - Tests: current-registry resolution, null-field create/adopt and missing-authorization pre-insert
-  rejection are required alongside the existing collision/concurrency contract. The qualification
-  loop follows the accepted impact-manifest policy; one complete C-01–C-09 run remains mandatory
-  after the corrected release candidate is frozen.
+  rejection are covered alongside the existing collision/concurrency contract. The qualification
+  loop follows the accepted impact-manifest policy; one complete C-01-C-09 run passed after the
+  corrected release candidate was frozen.
+- Final candidate: application commit `90eb476a92f707bc72f14b19ab11a6ad80ba827f`, protected
+  source run `31721387081`, OCI manifest
+  `sha256:66bf84d5668062d1463c96892809737533669d76c51c7e40366a5a26a02fa46b`, config
+  `sha256:2b627d786d51a2a422d5b223d70d91159e489a56bedb0a4d1cb538fbe7567973`, embedded SDK
+  SHA-256 `15fa2b2178735854738421373f61ee655fd694536de77fb1db62cc7cfd1f85ba` and VERSION
+  `90eb476a9`. Final generation JCS is
+  `4fa1c756f77433f19f375eedfc18b171733dbd02fd6ae30f5f652c3af4d23c85`.
+- Publication: PR `#45` passed run `31731569893` and merged as
+  `134cbcd56aca3de1618e7d31462bf5c4bb7c1aa3`; protected run `31731771531`, GHCR run
+  `31731961802` and develop ECR mirror run `31732145196` passed. GHCR package version
+  `1130382332`, ECR tags `candidate-90eb476a9` and `qualified-66bf84d56680`, and the commit-pinned
+  GHCR tag resolve byte-identically to the reviewed manifest.
+- Target qualification: C-01 passed with the bounded temporary stateful-risk acceptance and zero
+  critical/high findings. C-02/C-03 passed as a transparent composite: 26 bundle-dependent live
+  cases plus the unchanged two-principal `28/28` structural isolation result; the raw one-principal
+  target file remains labelled `26/28`. C-04 passed `30/30`, C-05 `14/14`, C-06 wrong-key and
+  untrusted-CA negatives failed closed, C-07M passed dirty/clean restart, C-08 exact generation and
+  create/adopt/collision passed, and C-09 clean rebuild equivalence passed. Architecture Evidence
+  0034 artifact `0039-mmrf0017-90eb476a9` owns the content-free hashes and target identity.
 - Rollback: keep consumer/default fenced and restore the previous image. Never repair availability
   by recreating `tenant_llm`, inventing a numeric surrogate or bypassing current-registry lookup.
 
@@ -426,13 +448,14 @@ test does not by itself qualify a runtime bundle.
 | Evidence | Status |
 |---|---|
 | Source patch and focused tests | Implemented; exact route `1`, upload/auth/provider `9`, SDK `8`, embedding `23` passed on Python 3.13.14. The transaction-context regression also passed in the complete upload service file (`22` tests). |
+| MM-RF-0017 source CI | PR `#44` source commit `90eb476a92f707bc72f14b19ab11a6ad80ba827f` passed PR run `31721184270` and protected run `31721387081`. Publication workflow PR `#45` passed PR run `31731569893`, merged as `134cbcd56aca3de1618e7d31462bf5c4bb7c1aa3`, and passed protected run `31731771531`. |
 | Required source CI | `musemind-provider-contract` passed for application-remediation PR `MuseMinds/ragflow#5`: PR run `31325124546`, protected-branch merge run `31325377993`, merge commit `90f69de96c21023a0dc741ad8f0e27357a94d77f`. C-02/C-03 harness PR `#7`: PR run `31328879842`, protected-branch merge run `31328950365`, merge commit `e27df812f9c2a0dd10ecb5ff1436b755d645a5e5`. C-04 harness PR `#9`: PR run `31329923099`, protected-branch merge run `31330292083`, merge commit `80dd3b66e2f10416b7f72687507ae275451aac7f`. C-04 clean-preflight fix PR `#11`: PR run `31335771848`, protected-branch merge run `31335962837`, merge commit `c24f8942d10964ebd2258ac6372ed69885712712`. C-04 transaction-context fix PR `#13`: PR run `31338206113`, protected-branch merge run `31338289729`, merge commit `e2513ed33107a92b5d1a8e53bf5d0279be708eba`. C-04 chunk page-size fix PR `#15`: PR run `31343172258`, protected-branch merge run `31343255000`, merge commit `201608f54d360700f7fb26a9fffcbc0d9a0d3d25`. C-05 harness PR `#17`: PR run `31366255142`, protected-branch merge run `31366398618`, merge commit `6991c50355e77c5e3e5c59b0021cb28ee9315927`. MinIO exact-prefix connector PR `#19`: PR run `31387152615`, protected-branch merge run `31387326684`, merge commit `6bdea2b01fc33b6018fe7cc36a7064acb6ecd89e`. Provider bootstrap/ledger and Selenium remediation protected runs `31481057849`, `31481235029`, `31481447412`, `31481599539`, `31489152862`, `31489730264`, `31490285058` and `31490440309` passed. Publication workflow PR `#27` passed PR run `31496232094` and protected-branch run `31496421445`, merge commit `492481af674e67aef7c6c38f0a0dbcc717a67bde`. Provider-defaults PR `#29` passed PR run `31502008323` and protected run `31502204693`; fail-closed VERSION PR `#30` passed PR run `31503870525` and protected run `31504123674`; exact-bundle publication PR `#31` passed PR run `31508722379` and the protected job in run `31509111665`, merge commit `37de7d6653d6652a47e607871d3222cc50858b11`. Jina generation PR `#33` passed PR run `31534866305` and protected run `31535100326`, merge commit `95c311e81ca2409ed38b1a214d894fae4bf59996`. Jina publication PR `#34` passed PR run `31576750709` and protected run `31576907045`, merge commit `afa9cc9fa81c2e48b29886ee6da40f397ee62b7f`. |
 | Branch protection for `musemind` | Active 2026-08-09: PR required, admins enforced, conversations resolved, stale reviews dismissed, no force-push/delete; strict required check `musemind-provider-contract` |
-| OCI application digest and embedded SDK checksum | Exact no-cache source commit `d8ba5c612c9c9a93eed7c1f1e37efe41d8518c18`: OCI manifest `sha256:5e16419f70b706bc607028a222c1794526061518341e3386ec5c84439e6987dd`; config/local image ID `sha256:5c4234ba601cc8d9e8f025b1bcd44b254db417df13dc82a2050d0516f65440bc`; SDK SHA-256 `3778e4266815ada9fc88461696c8f40e49bbe3b028824caed7f00c2334812250`; VERSION `v0.26.4-42-gd8ba5c612`. Protected run `31636465612`, runtime Jina import and exact ECR readback passed. |
-| Develop ECR mirror | ECR tags `candidate-d8ba5c612` and `qualified-5e16419f70b7` resolve to the same immutable manifest `sha256:5e16419f70b706bc607028a222c1794526061518341e3386ec5c84439e6987dd`; the manifest config equals the scanned local image ID. Governed GHCR publication and mirror readback are the next C-01 closure operations. |
-| Stateful service digests and config checksum | The same five exact stateful digests remain unchanged and are enumerated in Architecture Review 0044. RFC 8785 generation checksum remains `dbdaf71cd1d4ca59db5df3d7d78562af359318bfa6b5991be0a265e8f990b6c2`; MM-RF-0016 changes dataset create/adopt only and does not mutate the immutable generation. |
-| SBOM and vulnerability disposition | Exact application bundle SBOM produced with Syft 1.50.0; deterministic gzip SHA-256 `58a3132a23068e18d61be13270c7bb01a7e21394aaaa7086fd3b7ec0a3719026`. Trivy 0.70.0 found 0 Critical, 0 High, 55 Medium, 72 Low and 0 Unknown; deterministic report gzip SHA-256 `8b57960c7c0bec038ae6b5aff9a6a3ebe6fcf760d548eba577f08ae106fa7adc`. The isolated secret scan had only the three previously reviewed Tencent/UI heuristics and no MuseMind, Jina or provider credential. Unchanged stateful findings remain under the bounded Review 0044 acceptance through 2026-09-30. |
-| C-01–C-09 reproducible results | C-01 local build/runtime/SBOM/vulnerability/secret evidence is `PASSED WITH TEMPORARY RISK ACCEPTANCE` for exact bundle `d8ba5c612…` and generation `dbdaf71c…`; registry publication is in progress. C-02–C-09 must be rerun on this exact bundle; prior live results remain historical and are not inferred. |
-| C-02/C-03 conformance harness | Last historical live result on bundle `6bdea2b01…`: `28/28`, counter proof `AVAILABLE`, zero provider delta for every reject and exact allowlisted provenance; result SHA-256 `0290522815a3654d94fde35685d20ffdc9b7dca8f807bfb21cfe61b1478a02ea`. Exact-bundle target rerun is pending. |
-| C-04 conformance harness | Last historical live result on bundle `6bdea2b01…`: clean namespace and `30/30`; result SHA-256 `571c5dbb9d3079f4f766d937f70cf5944a281c5177ab417d723cb98652b36354`. Exact-bundle clean-namespace rerun is pending after bootstrap/readiness. |
-| C-05 conformance harness | Last historical live result on bundle `6bdea2b01…`: `14/14`, invalid intake zero provider calls, three valid MIME terminal `DONE`, amplifying PDF deadline/cancel with zero chunks and canary absent; result SHA-256 `0d0eae4f516bea4f390ec40a8663e1952c89fdc7a316c5b494db61459b0a5c05`. Exact-bundle target rerun is pending. |
+| OCI application digest and embedded SDK checksum | Exact no-cache source commit `90eb476a92f707bc72f14b19ab11a6ad80ba827f`: OCI manifest `sha256:66bf84d5668062d1463c96892809737533669d76c51c7e40366a5a26a02fa46b`; config `sha256:2b627d786d51a2a422d5b223d70d91159e489a56bedb0a4d1cb538fbe7567973`; SDK SHA-256 `15fa2b2178735854738421373f61ee655fd694536de77fb1db62cc7cfd1f85ba`; VERSION `90eb476a9`. Protected run `31721387081` passed. |
+| Governed registry publication | ECR tags `candidate-90eb476a9` and `qualified-66bf84d56680` plus GHCR commit tag resolve to manifest `sha256:66bf84d5668062d1463c96892809737533669d76c51c7e40366a5a26a02fa46b`. GHCR package version `1130382332`; publication run `31731961802`; ECR mirror run `31732145196`. |
+| Stateful service digests and config checksum | The five exact stateful digests remain unchanged under Architecture Review 0044. Final RFC 8785 generation checksum is `4fa1c756f77433f19f375eedfc18b171733dbd02fd6ae30f5f652c3af4d23c85`; target readback passed. |
+| SBOM and vulnerability disposition | Syft 1.50.0 raw SBOM SHA-256 `f058470354de46609498584be882d9a66bfb0a64945482c08fe52e9db4ed2641`. Trivy 0.70.0 raw report SHA-256 `2932898db5a74e274e6ac80e862feca0a0da4f3380284db323735d0deda86f53`: 0 Critical, 0 High, 55 Medium, 72 Low, 0 Unknown. Secret scan SHA-256 `c4a6f8a16213a9a1c27b720c2ad4fe5e626069ea1ee716d9ac693b52ff20e5ac` found only three reviewed heuristics and no provider/workload credential. Stateful findings remain bounded by Review 0044 through 2026-09-30. |
+| C-01-C-09 reproducible results | `PASSED WITH TEMPORARY STATEFUL RISK ACCEPTANCE` on the exact frozen candidate. Architecture Evidence 0034 artifacts `0039-mmrf0017-90eb476a9/bundle-qualification.json` and `target-qualification-result.json` own the content-free result hashes. Candidate is qualified, not default. |
+| C-02/C-03 conformance harness | `PASSED_COMPOSITE`: 26/28 bundle-dependent cases on the one-principal target, plus unchanged structural two-principal `28/28` proof SHA-256 `0290522815a3654d94fde35685d20ffdc9b7dca8f807bfb21cfe61b1478a02ea`. Raw live result SHA-256 `ad0e7379b0723924b469ca8c9280494ec076b397ca92533c02ac50c493db88bd` remains labelled failed for its two unavailable foreign-principal cases. |
+| C-04 conformance harness | Fresh namespace `c04-mmrf0017-90eb476a9-20260813-01`, clean and `30/30`; result SHA-256 `554d5d25cf8289930dc291077a7b6f085864e76e4ba51e1bdc48c88bc227cc99`. |
+| C-05/C-06/C-07M/C-08/C-09 | C-05 `14/14`; C-06 wrong-key and untrusted-CA failed closed; C-07M exact-prefix dirty/clean restart passed; C-08 generation/create/adopt/collision passed; C-09 fresh clean rebuild equivalence passed. Exact hashes are in Architecture Evidence 0034 artifact `0039-mmrf0017-90eb476a9`. |
