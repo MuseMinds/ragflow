@@ -103,7 +103,7 @@ def create_or_adopt_dataset_identity(
     dataset_id: str,
     payload: dict[str, Any],
     expected_projection: dict[str, Any],
-    expected_tenant_embd_id: int,
+    expected_tenant_embd_id: int | None,
     insert: Callable[[dict[str, Any]], Any],
     read_for_authenticated_tenant: Callable[[str], Any | None],
 ) -> tuple[bool, dict[str, Any] | str]:

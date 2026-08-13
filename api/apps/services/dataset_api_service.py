@@ -122,9 +122,9 @@ async def create_dataset(tenant_id: str, req: dict):
     return True, response_data
 
 
-def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection: dict) -> tuple[dict, dict, int]:
+def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection: dict) -> tuple[dict, dict, int | None]:
     exists, tenant = TenantService.get_by_id(tenant_id)
-    if not exists or tenant.embd_id != projection["embd_id"] or tenant.tenant_embd_id is None:
+    if not exists or tenant.embd_id != projection["embd_id"]:
         raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
 
     try:
@@ -143,7 +143,7 @@ def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection
         "description": "",
         "avatar": None,
         "embd_id": projection["embd_id"],
-        "tenant_embd_id": tenant.tenant_embd_id,
+        "tenant_embd_id": None,
         "permission": "team",
         "status": StatusEnum.VALID.value,
         "parser_id": projection["parser_id"],
@@ -171,7 +171,7 @@ def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection
         "avatar": payload["avatar"],
     }
     canonical_dataset_projection_bytes(expected)
-    return payload, expected, tenant.tenant_embd_id
+    return payload, expected, None
 
 
 def create_or_adopt_musemind_dataset(tenant_id: str, req: dict):
