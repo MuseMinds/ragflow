@@ -15,7 +15,7 @@ jobs:
       id-token: write
       packages: read
     env:
-      SOURCE_DIGEST: sha256:5e16419f70b706bc607028a222c1794526061518341e3386ec5c84439e6987dd
+      SOURCE_DIGEST: sha256:66bf84d5668062d1463c96892809737533669d76c51c7e40366a5a26a02fa46b
       SOURCE_IMAGE: ghcr.io/museminds/ragflow
       TARGET_REPOSITORY: musemind/develop/rag/ragflow
     steps:
