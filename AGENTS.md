@@ -3,6 +3,10 @@
 Use this file as the local operating guide for the current codebase. Prefer the code and the current CLAUDE.md over any older convention or remembered project shape.
 
 ## Core stance
+- The MuseMind pilot runs the currently qualified `musemind` commit/digest as a frozen dependency.
+  Do not add a MuseMind patch unless the exact behavior is reproduced on the compatible official
+  upstream image and cannot be safely normalized at the private RAG Integration proxy. Pilot-ASAP
+  work belongs outside this repository by default.
 - Treat legacy code as liability, not as a compatibility target.
 - Prefer deletion over shims, deprecated branches, wrapper APIs, and dual-track migration notes.
 - If old and new implementations coexist, converge to one path unless an external contract forces compatibility.
@@ -60,6 +64,8 @@ Use this file as the local operating guide for the current codebase. Prefer the 
 - Do not add new compatibility wording in comments or docs.
 - Mirror a qualified MuseMind runtime image to environment ECR without rebuilding it, and fail the
   workflow unless the destination manifest digest exactly equals the reviewed source digest.
+- Any unavoidable pilot patch remains a small `mm/*` branch change with focused tests, patch-ledger
+  update and full dependency-scoped qualification before its digest can replace the frozen one.
 - ADR-0037's first API generation is the exact Jina v3 request contract recorded in
   `MUSEMIND_PATCHES.md`. Reconcile its service-tenant key only through the schema-aware one-shot;
   provider/model/request changes require a new immutable generation, key rotation does not, and no
