@@ -29,7 +29,6 @@ from api.db.joint_services.tenant_model_service import get_tenant_default_model_
 from common.constants import LLMType
 from common.parser_config_utils import normalize_layout_recognizer
 from deepdoc.vision import OCR
-from rag.app.musemind_vision import vision_llm_chunk
 from rag.nlp import attach_media_context, rag_tokenizer, tokenize
 from rag.llm.musemind_gemini import MUSEMIND_GEMINI_IMAGE_ID
 
