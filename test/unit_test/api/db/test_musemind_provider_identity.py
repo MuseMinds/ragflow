@@ -30,6 +30,7 @@ CURRENT_TOKEN = "c" * 64
 PREVIOUS_TOKEN = "p" * 64
 JINA_API_KEY = "jina_" + "j" * 59
 ROTATED_JINA_API_KEY = "jina_" + "r" * 59
+GEMINI_API_KEY = "AIza" + "g" * 60
 
 
 class MemoryStore:
@@ -149,6 +150,68 @@ def make_spec(
         previous_token=previous,
         operation=operation,
     )
+
+
+class GeminiMemoryStore(MemoryStore):
+    def create_tenant(self, spec):
+        self.tenants[spec.principal_id] = TenantState(
+            id=spec.principal_id,
+            name=spec.nickname,
+            embd_id="gemini-embedding-2@musemind@Gemini",
+            llm_id="gemini-3.1-flash-lite@musemind@Gemini",
+            img2txt_id="gemini-3.5-flash@musemind@Gemini",
+            rerank_id="",
+            status="1",
+        )
+
+    def repair_tenant_embedding_default(self, spec):
+        self.create_tenant(spec)
+
+    def create_embedding_authorization(self, spec):
+        for model_name, model_type, max_tokens in (
+            ("gemini-3.1-flash-lite", "chat", 1_048_576),
+            ("gemini-embedding-2", "embedding", 8192),
+            ("gemini-3.5-flash", "image2text", 1_048_576),
+        ):
+            self.embedding_authorizations[model_name] = EmbeddingAuthorizationState(
+                tenant_id=spec.principal_id,
+                llm_factory="Gemini",
+                model_type=model_type,
+                llm_name=model_name,
+                api_key=spec.gemini_api_key,
+                api_base=None,
+                max_tokens=max_tokens,
+                status="active",
+            )
+
+    def rotate_embedding_credential(self, spec):
+        for name, authorization in tuple(self.embedding_authorizations.items()):
+            self.embedding_authorizations[name] = replace(authorization, api_key=spec.gemini_api_key)
+
+
+def test_gemini_provider_reconciles_one_instance_three_models_and_rotates_key():
+    store = GeminiMemoryStore()
+    spec = ProviderIdentitySpec(
+        rag_instance_id=INSTANCE_ID,
+        environment="develop",
+        current_token=CURRENT_TOKEN,
+        gemini_api_key=GEMINI_API_KEY,
+    )
+
+    created = reconcile_provider_identity(store, spec)
+    unchanged = reconcile_provider_identity(store, spec)
+    rotated = reconcile_provider_identity(store, replace(spec, gemini_api_key="AIza" + "r" * 60))
+
+    assert created.outcome == "CREATED"
+    assert unchanged.outcome == "UNCHANGED"
+    assert rotated.outcome == "REPAIRED"
+    assert len(spec.desired_model_ids) == 3
+    assert len(set((spec.provider_id, spec.instance_id, *spec.desired_model_ids))) == 5
+    assert {state.llm_name for state in store.embedding_authorizations.values()} == {
+        "gemini-3.1-flash-lite",
+        "gemini-embedding-2",
+        "gemini-3.5-flash",
+    }
 
 
 def test_principal_id_is_stable_and_domain_scoped():

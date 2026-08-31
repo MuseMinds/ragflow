@@ -142,9 +142,10 @@ class MinerUParseOptions:
 
 
 class MinerUParser(RAGFlowPdfParser):
-    def __init__(self, mineru_path: str = "mineru", mineru_api: str = "", mineru_server_url: str = ""):
+    def __init__(self, mineru_path: str = "mineru", mineru_api: str = "", mineru_server_url: str = "", mineru_api_token: str | None = None):
         self.mineru_api = mineru_api.rstrip("/")
         self.mineru_server_url = mineru_server_url.rstrip("/")
+        self.mineru_api_token = mineru_api_token if mineru_api_token is not None else os.environ.get("MINERU_API_TOKEN", "")
         self.outlines = []
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -201,13 +202,18 @@ class MinerUParser(RAGFlowPdfParser):
                 with zip_ref.open(member) as src, open(dest_path, "wb") as dst:
                     shutil.copyfileobj(src, dst)
 
-    @staticmethod
-    def _is_http_endpoint_valid(url, timeout=5):
+    def _is_http_endpoint_valid(self, url, timeout=5):
         try:
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            response = requests.head(url, timeout=timeout, allow_redirects=True, headers=self._authorization_headers())
             return response.status_code in [200, 301, 302, 307, 308]
         except Exception:
             return False
+
+    def _authorization_headers(self) -> dict[str, str]:
+        headers = {"Accept": "application/json"}
+        if self.mineru_api_token:
+            headers["Authorization"] = f"Bearer {self.mineru_api_token}"
+        return headers
 
     @staticmethod
     def _sanitize_section_text(section: str) -> str:
@@ -308,7 +314,7 @@ class MinerUParser(RAGFlowPdfParser):
         self.logger.info(f"[MinerU] request {data=}")
         self.logger.info(f"[MinerU] request {options=}")
 
-        headers = {"Accept": "application/json"}
+        headers = self._authorization_headers()
         try:
             self.logger.info(f"[MinerU] invoke api: {self.mineru_api}/file_parse backend={options.backend} server_url={data.get('server_url')}")
             if callback:

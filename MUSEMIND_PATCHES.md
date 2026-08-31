@@ -443,6 +443,39 @@ test does not by itself qualify a runtime bundle.
 - Rollback: keep consumer/default fenced and restore the previous image. Never repair availability
   by recreating `tenant_llm`, inventing a numeric surrogate or bypassing current-registry lookup.
 
+## Patch MM-RF-0018 — Gemini multimodal generation v2
+
+- Contract: ADR-0078 adds the immutable `musemind.ragflow-generation/v2` candidate with
+  `gemini-embedding-2` at 3072 dimensions, `gemini-3.1-flash-lite` chat and
+  `gemini-3.5-flash` image-to-text. The Gemini embedding adapter emits one typed `Content` per
+  passage, query or image, applies the exact passage/query prefixes without `task_type`, rejects
+  rather than truncates over-limit inputs, verifies cardinality/dimension/finiteness and returns
+  normalized float32 vectors under a three-attempt, ten-second-per-attempt policy.
+- Multimodal ingestion: both the legacy and `TE_RUN_MODE=0` executors retain image bytes only in a
+  transient private field, embed image chunks without filename mixing, and remove the field before
+  indexing. Gemini image description verifies the pinned page/figure prompt file hashes and uses
+  the deterministic generation configuration. Raw text, prompts, outputs, bytes and provider
+  exception bodies are omitted from logs, traces, callbacks and errors. DeepDOC stays the default;
+  MinerU only gains an optional bearer header and remains inactive by default.
+- Registry and dataset identity: the schema-aware one-shot supports either the existing Jina
+  credential or a Gemini credential. Gemini reconciliation creates/adopts one deterministic
+  provider, one `musemind` instance and exactly three model rows, applies the three tenant defaults
+  with an empty reranker, rotates only the instance credential, and leaves Jina registry rows
+  untouched for whole-generation rollback. The strict create-or-adopt route and Python SDK now
+  accept v2, validate all three current-registry rows, pin the parser's chat/image models and
+  compare the complete v2 readback including server-derived `table_context_size=0` and
+  `children_delimiter=""`; v1 remains unchanged.
+- Qualification: synthetic unit tests cover typed text/image payloads and data URLs, MIME and
+  dimension denial, deterministic CV configuration and content-free errors, binary removal in the
+  refactored executor, three-row bootstrap create/idempotency/key rotation, v2 projection/readback,
+  SDK dispatch, optional MinerU bearer handling and the strict content-free Gemini probe result.
+  No unit test calls Google, Jina or MinerU. A clean OCI build, SBOM/vulnerability review and the
+  dependency-scoped live qualification remain required before this commit can replace the frozen
+  pilot digest.
+- Rollback: fence the Gemini candidate and restore the complete qualified Jina generation,
+  dataset/index set and binding. Never switch only a model over an index built in the other
+  embedding space, reuse vectors across generations or fall back automatically.
+
 ## Qualification status
 
 | Evidence | Status |

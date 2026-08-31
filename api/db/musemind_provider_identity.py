@@ -46,6 +46,17 @@ _JINA_MODEL_TYPE = "embedding"
 _JINA_ENDPOINT = "https://api.jina.ai/v1/embeddings"
 _JINA_INSTANCE_EXTRA = json.dumps({"base_url": _JINA_ENDPOINT}, sort_keys=True, separators=(",", ":"))
 _JINA_MODEL_EXTRA = json.dumps({"is_tools": False, "max_tokens": 8192}, sort_keys=True, separators=(",", ":"))
+_GEMINI_PROVIDER_DOMAIN = b"musemind/ragflow-gemini-provider/v2\0"
+_GEMINI_INSTANCE_DOMAIN = b"musemind/ragflow-gemini-instance/v2\0"
+_GEMINI_MODEL_DOMAIN = b"musemind/ragflow-gemini-model/v2\0"
+_GEMINI_FACTORY = "Gemini"
+_GEMINI_INSTANCE = "musemind"
+_GEMINI_MODELS = (
+    ("gemini-3.1-flash-lite", "chat", 1_048_576),
+    ("gemini-embedding-2", "embedding", 8192),
+    ("gemini-3.5-flash", "image2text", 1_048_576),
+)
+_GEMINI_INSTANCE_EXTRA = "{}"
 
 
 class ReconciliationConflict(Exception):
@@ -61,7 +72,8 @@ class ProviderIdentitySpec:
     rag_instance_id: str
     environment: str
     current_token: str = field(repr=False)
-    jina_api_key: str = field(repr=False)
+    jina_api_key: str | None = field(default=None, repr=False)
+    gemini_api_key: str | None = field(default=None, repr=False)
     previous_token: str | None = field(default=None, repr=False)
     operation: str = "reconcile"
 
@@ -93,6 +105,52 @@ class ProviderIdentitySpec:
     @property
     def jina_model_id(self) -> str:
         return hashlib.sha256(_JINA_MODEL_DOMAIN + self.principal_id.encode("ascii")).hexdigest()[:32]
+
+    @property
+    def provider_kind(self) -> str:
+        if self.gemini_api_key is not None and self.jina_api_key is None:
+            return _GEMINI_FACTORY
+        if self.jina_api_key is not None and self.gemini_api_key is None:
+            return _JINA_FACTORY
+        raise ReconciliationConflict("PROVIDER_CREDENTIAL_SELECTION_INVALID")
+
+    @property
+    def provider_api_key(self) -> str:
+        return self.gemini_api_key if self.provider_kind == _GEMINI_FACTORY else self.jina_api_key  # type: ignore[return-value]
+
+    @property
+    def provider_id(self) -> str:
+        if self.provider_kind == _JINA_FACTORY:
+            return self.jina_provider_id
+        return hashlib.sha256(_GEMINI_PROVIDER_DOMAIN + self.principal_id.encode("ascii")).hexdigest()[:32]
+
+    @property
+    def instance_id(self) -> str:
+        if self.provider_kind == _JINA_FACTORY:
+            return self.jina_instance_id
+        return hashlib.sha256(_GEMINI_INSTANCE_DOMAIN + self.principal_id.encode("ascii")).hexdigest()[:32]
+
+    def model_id(self, model_name: str) -> str:
+        if self.provider_kind == _JINA_FACTORY:
+            return self.jina_model_id
+        material = _GEMINI_MODEL_DOMAIN + self.principal_id.encode("ascii") + b"\0" + model_name.encode("ascii")
+        return hashlib.sha256(material).hexdigest()[:32]
+
+    @property
+    def desired_model_ids(self) -> tuple[str, ...]:
+        names = (_JINA_MODEL,) if self.provider_kind == _JINA_FACTORY else tuple(model[0] for model in _GEMINI_MODELS)
+        return tuple(self.model_id(name) for name in names)
+
+    @property
+    def desired_defaults(self) -> dict[str, str]:
+        if self.provider_kind == _JINA_FACTORY:
+            return {"embd_id": _JINA_MODEL_ID}
+        return {
+            "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+            "embd_id": "gemini-embedding-2@musemind@Gemini",
+            "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+            "rerank_id": "",
+        }
 
     @property
     def desired_tokens(self) -> frozenset[str]:
@@ -129,6 +187,9 @@ class TenantState:
     name: str | None
     embd_id: str | None
     status: str | None
+    llm_id: str | None = None
+    img2txt_id: str | None = None
+    rerank_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -254,7 +315,8 @@ def validate_spec(spec: ProviderIdentitySpec) -> None:
     if spec.operation not in {"reconcile", "revoke-previous"}:
         raise ReconciliationConflict("INVALID_OPERATION")
     _validate_token(spec.current_token, "INVALID_CURRENT_TOKEN")
-    _validate_token(spec.jina_api_key, "INVALID_JINA_API_KEY")
+    provider_kind = spec.provider_kind
+    _validate_token(spec.provider_api_key, f"INVALID_{provider_kind.upper()}_API_KEY")
     if spec.previous_token is not None:
         _validate_token(spec.previous_token, "INVALID_PREVIOUS_TOKEN")
         if spec.previous_token == spec.current_token:
@@ -367,22 +429,26 @@ def _validate_snapshot(spec: ProviderIdentitySpec, snapshot: ProviderSnapshot) -
     if unexpected:
         raise ReconciliationConflict("UNEXPECTED_TOKEN_CONFLICT")
 
-    if len(snapshot.embedding_authorizations) > 1:
+    expected_models = ((_JINA_MODEL, _JINA_MODEL_TYPE, 8192),) if spec.provider_kind == _JINA_FACTORY else _GEMINI_MODELS
+    if len(snapshot.embedding_authorizations) not in (0, len(expected_models)):
         raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
     if snapshot.embedding_authorizations:
-        authorization = snapshot.embedding_authorizations[0]
-        if (
-            authorization.tenant_id != principal_id
-            or authorization.llm_factory != _JINA_FACTORY
-            or authorization.model_type != _JINA_MODEL_TYPE
-            or authorization.llm_name != _JINA_MODEL
-            or authorization.api_base != _JINA_ENDPOINT
-            or authorization.max_tokens != 8192
-            or authorization.status != "active"
-            or not authorization.api_key
-        ):
+        actual_models = {(authorization.llm_name, authorization.model_type, authorization.max_tokens) for authorization in snapshot.embedding_authorizations}
+        if actual_models != set(expected_models):
             raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
+        for authorization in snapshot.embedding_authorizations:
+            expected_base = _JINA_ENDPOINT if spec.provider_kind == _JINA_FACTORY else None
+            if (
+                authorization.tenant_id != principal_id
+                or authorization.llm_factory != spec.provider_kind
+                or authorization.api_base != expected_base
+                or authorization.status != "active"
+                or not authorization.api_key
+            ):
+                raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
 
+    if spec.provider_kind == _GEMINI_FACTORY and snapshot.legacy_embedding_authorizations:
+        raise ReconciliationConflict("LEGACY_EMBEDDING_AUTHORIZATION_CONFLICT")
     if len(snapshot.legacy_embedding_authorizations) > 1:
         raise ReconciliationConflict("LEGACY_EMBEDDING_AUTHORIZATION_CONFLICT")
     if snapshot.legacy_embedding_authorizations:
@@ -438,7 +504,7 @@ def reconcile_provider_identity(
         if snapshot.tenant is None:
             store.create_tenant(spec)
             created_rows += 1
-        elif snapshot.tenant.embd_id != _JINA_MODEL_ID:
+        elif any(getattr(snapshot.tenant, field_name) != expected for field_name, expected in spec.desired_defaults.items()):
             store.repair_tenant_embedding_default(spec)
             repaired_rows += 1
 
@@ -459,11 +525,11 @@ def reconcile_provider_identity(
         if not snapshot.embedding_authorizations:
             store.create_embedding_authorization(spec)
             created_rows += 1
-        elif snapshot.embedding_authorizations[0].api_key != spec.jina_api_key:
+        elif snapshot.embedding_authorizations[0].api_key != spec.provider_api_key:
             store.rotate_embedding_credential(spec)
             repaired_rows += 1
 
-        if snapshot.legacy_embedding_authorizations:
+        if snapshot.legacy_embedding_authorizations and spec.provider_kind == _JINA_FACTORY:
             store.delete_legacy_embedding_authorization(spec)
             repaired_rows += 1
 
@@ -481,7 +547,7 @@ def reconcile_provider_identity(
         repaired_rows=repaired_rows,
         revoked_tokens=revoked_tokens,
         desired_token_count=len(spec.desired_tokens),
-        embedding_credential_fingerprint=hashlib.sha256(spec.jina_api_key.encode("ascii")).hexdigest()[:16],
+        embedding_credential_fingerprint=hashlib.sha256(spec.provider_api_key.encode("ascii")).hexdigest()[:16],
     )
 
 
@@ -621,31 +687,34 @@ class PeeweeProviderIdentityStore:
         memberships = tuple(membership_model.select().where((membership_model.user_id == principal_id) | (membership_model.tenant_id == principal_id)))
         tenant_tokens = tuple(token_model.select().where(token_model.tenant_id == principal_id))
         desired_token_owners = tuple(token_model.select().where(token_model.token.in_(spec.inspected_tokens)))
-        legacy_embedding_authorizations = tuple(
-            tenant_llm_model.select().where(
-                (tenant_llm_model.tenant_id == principal_id)
-                & (tenant_llm_model.model_type == _JINA_MODEL_TYPE)
+        legacy_embedding_authorizations = ()
+        if spec.provider_kind == _JINA_FACTORY:
+            legacy_embedding_authorizations = tuple(
+                tenant_llm_model.select().where(
+                    (tenant_llm_model.tenant_id == principal_id)
+                    & (tenant_llm_model.model_type == _JINA_MODEL_TYPE)
+                )
             )
-        )
 
         provider_model = self.TenantModelProvider
         instance_model = self.TenantModelInstance
         embedding_model = self.TenantModel
+        factory = spec.provider_kind
         providers = tuple(
             provider_model.select().where(
-                ((provider_model.tenant_id == principal_id) & (provider_model.provider_name == _JINA_FACTORY))
-                | (provider_model.id == spec.jina_provider_id)
+                ((provider_model.tenant_id == principal_id) & (provider_model.provider_name == factory))
+                | (provider_model.id == spec.provider_id)
             )
         )
         provider_ids = [provider.id for provider in providers]
-        instance_predicate = instance_model.id == spec.jina_instance_id
+        instance_predicate = instance_model.id == spec.instance_id
         if provider_ids:
             instance_predicate = instance_predicate | instance_model.provider_id.in_(provider_ids)
         instances = tuple(
             instance_model.select().where(instance_predicate)
         )
         instance_ids = [instance.id for instance in instances]
-        model_predicate = embedding_model.id == spec.jina_model_id
+        model_predicate = embedding_model.id.in_(spec.desired_model_ids)
         if provider_ids:
             model_predicate = model_predicate | embedding_model.provider_id.in_(provider_ids)
         if instance_ids:
@@ -654,45 +723,54 @@ class PeeweeProviderIdentityStore:
 
         embedding_authorizations: tuple[EmbeddingAuthorizationState, ...] = ()
         if providers or instances or models:
-            if len(providers) != 1 or len(instances) != 1 or len(models) != 1:
+            expected_model_count = 1 if factory == _JINA_FACTORY else len(_GEMINI_MODELS)
+            if len(providers) != 1 or len(instances) != 1 or len(models) != expected_model_count:
                 raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
             provider = providers[0]
             instance = instances[0]
-            model = models[0]
             try:
                 instance_extra = json.loads(instance.extra)
-                model_extra = json.loads(model.extra)
+                model_extras = {model.model_name: json.loads(model.extra) for model in models}
             except (TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT") from exc
+            expected_instance_extra = {"base_url": _JINA_ENDPOINT} if factory == _JINA_FACTORY else {}
             if (
-                provider.id != spec.jina_provider_id
+                provider.id != spec.provider_id
                 or provider.tenant_id != principal_id
-                or provider.provider_name != _JINA_FACTORY
-                or instance.id != spec.jina_instance_id
+                or provider.provider_name != factory
+                or instance.id != spec.instance_id
                 or instance.provider_id != provider.id
-                or instance.instance_name != _JINA_INSTANCE
+                or instance.instance_name != "musemind"
                 or instance.status != "active"
-                or instance_extra != {"base_url": _JINA_ENDPOINT}
-                or model.id != spec.jina_model_id
-                or model.provider_id != provider.id
-                or model.instance_id != instance.id
-                or model.model_name != _JINA_MODEL
-                or model.model_type != _JINA_MODEL_TYPE
-                or model.status != "active"
-                or model_extra != {"is_tools": False, "max_tokens": 8192}
+                or instance_extra != expected_instance_extra
             ):
                 raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
-            embedding_authorizations = (
+            expected_models = ((_JINA_MODEL, _JINA_MODEL_TYPE, 8192),) if factory == _JINA_FACTORY else _GEMINI_MODELS
+            expected_by_name = {name: (model_type, max_tokens) for name, model_type, max_tokens in expected_models}
+            for model in models:
+                expected = expected_by_name.get(model.model_name)
+                if (
+                    expected is None
+                    or model.id != spec.model_id(model.model_name)
+                    or model.provider_id != provider.id
+                    or model.instance_id != instance.id
+                    or model.model_type != expected[0]
+                    or model.status != "active"
+                    or model_extras[model.model_name] != {"is_tools": False, "max_tokens": expected[1]}
+                ):
+                    raise ReconciliationConflict("EMBEDDING_AUTHORIZATION_CONFLICT")
+            embedding_authorizations = tuple(
                 EmbeddingAuthorizationState(
                     tenant_id=principal_id,
                     llm_factory=provider.provider_name,
                     model_type=model.model_type,
                     llm_name=model.model_name,
                     api_key=instance.api_key,
-                    api_base=instance_extra["base_url"],
-                    max_tokens=model_extra["max_tokens"],
+                    api_base=instance_extra.get("base_url"),
+                    max_tokens=model_extras[model.model_name]["max_tokens"],
                     status=model.status,
-                ),
+                )
+                for model in models
             )
 
         return ProviderSnapshot(
@@ -703,6 +781,9 @@ class PeeweeProviderIdentityStore:
                 name=tenant.name,
                 embd_id=tenant.embd_id,
                 status=tenant.status,
+                llm_id=tenant.llm_id,
+                img2txt_id=tenant.img2txt_id,
+                rerank_id=tenant.rerank_id,
             )
             if tenant
             else None,
@@ -761,7 +842,7 @@ class PeeweeProviderIdentityStore:
 
     def create_tenant(self, spec: ProviderIdentitySpec) -> None:
         tenant_defaults = dict(self.tenant_defaults)
-        tenant_defaults["embd_id"] = _JINA_MODEL_ID
+        tenant_defaults.update(spec.desired_defaults)
         self.Tenant.insert(
             id=spec.principal_id,
             name=spec.nickname,
@@ -774,7 +855,7 @@ class PeeweeProviderIdentityStore:
         timestamps = self._timestamps()
         updated = (
             self.Tenant.update(
-                embd_id=_JINA_MODEL_ID,
+                **spec.desired_defaults,
                 update_time=timestamps["update_time"],
                 update_date=timestamps["update_date"],
             )
@@ -787,42 +868,44 @@ class PeeweeProviderIdentityStore:
     def create_embedding_authorization(self, spec: ProviderIdentitySpec) -> None:
         timestamps = self._timestamps()
         self.TenantModelProvider.insert(
-            id=spec.jina_provider_id,
-            provider_name=_JINA_FACTORY,
+            id=spec.provider_id,
+            provider_name=spec.provider_kind,
             tenant_id=spec.principal_id,
             **timestamps,
         ).execute()
         self.TenantModelInstance.insert(
-            id=spec.jina_instance_id,
-            instance_name=_JINA_INSTANCE,
-            provider_id=spec.jina_provider_id,
-            api_key=spec.jina_api_key,
+            id=spec.instance_id,
+            instance_name="musemind",
+            provider_id=spec.provider_id,
+            api_key=spec.provider_api_key,
             status="active",
-            extra=_JINA_INSTANCE_EXTRA,
+            extra=_JINA_INSTANCE_EXTRA if spec.provider_kind == _JINA_FACTORY else _GEMINI_INSTANCE_EXTRA,
             **timestamps,
         ).execute()
-        self.TenantModel.insert(
-            id=spec.jina_model_id,
-            model_name=_JINA_MODEL,
-            provider_id=spec.jina_provider_id,
-            instance_id=spec.jina_instance_id,
-            model_type=_JINA_MODEL_TYPE,
-            status="active",
-            extra=_JINA_MODEL_EXTRA,
-            **timestamps,
-        ).execute()
+        models = ((_JINA_MODEL, _JINA_MODEL_TYPE, 8192),) if spec.provider_kind == _JINA_FACTORY else _GEMINI_MODELS
+        for model_name, model_type, max_tokens in models:
+            self.TenantModel.insert(
+                id=spec.model_id(model_name),
+                model_name=model_name,
+                provider_id=spec.provider_id,
+                instance_id=spec.instance_id,
+                model_type=model_type,
+                status="active",
+                extra=json.dumps({"is_tools": False, "max_tokens": max_tokens}, sort_keys=True, separators=(",", ":")),
+                **timestamps,
+            ).execute()
 
     def rotate_embedding_credential(self, spec: ProviderIdentitySpec) -> None:
         timestamps = self._timestamps()
         updated = (
             self.TenantModelInstance.update(
-                api_key=spec.jina_api_key,
+                api_key=spec.provider_api_key,
                 update_time=timestamps["update_time"],
                 update_date=timestamps["update_date"],
             )
             .where(
-                (self.TenantModelInstance.id == spec.jina_instance_id)
-                & (self.TenantModelInstance.provider_id == spec.jina_provider_id)
+                (self.TenantModelInstance.id == spec.instance_id)
+                & (self.TenantModelInstance.provider_id == spec.provider_id)
             )
             .execute()
         )
@@ -904,7 +987,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rag-instance-id", required=True)
     parser.add_argument("--environment", required=True)
     parser.add_argument("--current-token-file", required=True)
-    parser.add_argument("--jina-api-key-file", required=True)
+    provider_keys = parser.add_mutually_exclusive_group(required=True)
+    provider_keys.add_argument("--jina-api-key-file")
+    provider_keys.add_argument("--gemini-api-key-file")
     parser.add_argument("--previous-token-file")
     parser.add_argument("--previous-valid-until")
     parser.add_argument(
@@ -918,7 +1003,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _spec_from_args(args: argparse.Namespace) -> ProviderIdentitySpec:
     current_token = read_secret_file(args.current_token_file)
-    jina_api_key = read_secret_file(args.jina_api_key_file)
+    jina_api_key = read_secret_file(args.jina_api_key_file) if args.jina_api_key_file else None
+    gemini_api_key = read_secret_file(args.gemini_api_key_file) if args.gemini_api_key_file else None
     previous_token = read_secret_file(args.previous_token_file) if args.previous_token_file else None
 
     if args.operation == "reconcile":
@@ -942,6 +1028,7 @@ def _spec_from_args(args: argparse.Namespace) -> ProviderIdentitySpec:
         environment=normalized_environment,
         current_token=current_token,
         jina_api_key=jina_api_key,
+        gemini_api_key=gemini_api_key,
         previous_token=previous_token,
         operation=args.operation,
     )

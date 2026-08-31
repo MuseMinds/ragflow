@@ -113,3 +113,22 @@ def test_transfer_to_sections_skips_unknown_types_without_duplicating_text(monke
 
     assert [section[0] for section in sections] == ["Primary content", "Next content"]
     assert "Skip unsupported section type=sidebar" in caplog.text
+
+
+def test_optional_mineru_bearer_is_attached_without_logging(monkeypatch, caplog):
+    module = _load_mineru_parser(monkeypatch)
+    token = "mineru-secret-token"
+    parser = module.MinerUParser(mineru_api="https://mineru.invalid", mineru_api_token=token)
+    calls = []
+    monkeypatch.setattr(
+        module.requests,
+        "head",
+        lambda url, **kwargs: calls.append((url, kwargs)) or type("Response", (), {"status_code": 200})(),
+    )
+
+    with caplog.at_level(logging.INFO, logger=parser.logger.name):
+        assert parser._is_http_endpoint_valid("https://mineru.invalid/openapi.json")
+
+    assert calls[0][1]["headers"]["Authorization"] == f"Bearer {token}"
+    assert token not in caplog.text
+    assert module.MinerUParser(mineru_api="https://mineru.invalid", mineru_api_token="")._authorization_headers() == {"Accept": "application/json"}

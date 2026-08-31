@@ -21,7 +21,7 @@ from quart import request
 from api.apps import current_user, login_required
 from api.apps.services import dataset_api_service
 from api.utils.api_utils import add_tenant_id_to_kwargs, get_error_argument_result, get_error_data_result, get_json_result, get_result
-from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV1
+from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV1, MuseMindDatasetCreateOrAdoptV2
 from api.utils.pagination_utils import validate_rest_api_page_size
 from api.utils.validation_utils import (
     CreateDatasetReq,
@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 @add_tenant_id_to_kwargs
 async def create_or_adopt_musemind_exact_dataset(tenant_id: str | None = None):
     """Create or adopt a PostgreSQL-derived MuseMind dataset identity."""
-    req, err = await validate_and_parse_json_request(request, MuseMindDatasetCreateOrAdoptV1)
+    raw = await request.get_json(silent=True)
+    request_type = MuseMindDatasetCreateOrAdoptV2 if isinstance(raw, dict) and raw.get("schema") == "musemind.ragflow-dataset-create-or-adopt/v2" else MuseMindDatasetCreateOrAdoptV1
+    req, err = await validate_and_parse_json_request(request, request_type)
     if err is not None:
         return get_error_argument_result(err)
 

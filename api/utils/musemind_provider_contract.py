@@ -19,11 +19,12 @@ from typing import Annotated, Any, Callable, Literal
 
 import rfc8785
 from peewee import IntegrityError
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
-from api.utils.validation_utils import ParserConfig
+from api.utils.validation_utils import ParentChildConfig, ParserConfig, RaptorConfig
 
 MUSEMIND_DATASET_PROJECTION_SCHEMA = "musemind.ragflow-dataset-provider-projection/v1"
+MUSEMIND_DATASET_PROJECTION_SCHEMA_V2 = "musemind.ragflow-dataset-provider-projection/v2"
 MUSEMIND_DATASET_COLLISION = "PROVIDER_DATASET_IDENTITY_COLLISION"
 
 
@@ -64,6 +65,54 @@ class MuseMindDatasetCreateOrAdoptV1(BaseModel):
     provider_projection: MuseMindDatasetProviderProjectionV1
 
 
+class MuseMindParserConfigV2(ParserConfig):
+    """Generation-v2 request fields absent from the generic dataset API."""
+
+    delimiter: Literal["\n"] = "\n"
+    parent_child: ParentChildConfig = Field(default_factory=lambda: ParentChildConfig(use_parent_child=False, children_delimiter="\n"))
+    raptor: RaptorConfig = Field(default_factory=lambda: RaptorConfig(use_raptor=False, prompt="Summarize {cluster_content}"))
+    overlapped_percent: Annotated[int, Field(default=0, ge=0, le=100)]
+    image_context_size: Annotated[int, Field(default=0, ge=0, le=32)]
+    llm_id: Annotated[str, Field(min_length=3, max_length=128)]
+    img2txt_id: Annotated[str, Field(min_length=3, max_length=128)]
+
+
+class MuseMindDatasetProviderProjectionV2(BaseModel):
+    """Pinned Gemini generation-v2 dataset projection."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+
+    language: Literal["Italian"]
+    embd_id: Literal["gemini-embedding-2@musemind@Gemini"]
+    llm_id: Literal["gemini-3.1-flash-lite@musemind@Gemini"]
+    img2txt_id: Literal["gemini-3.5-flash@musemind@Gemini"]
+    parser_id: Literal["naive"]
+    parser_config: MuseMindParserConfigV2
+    similarity_threshold: Annotated[float, Field(ge=0.0, le=1.0)]
+    vector_similarity_weight: Annotated[float, Field(ge=0.0, le=1.0)]
+    pagerank: Annotated[int, Field(ge=0, le=9_007_199_254_740_991)]
+    pipeline_id: None
+
+    @model_validator(mode="after")
+    def validate_pinned_parser_models(self):
+        if self.parser_config.llm_id != self.llm_id or self.parser_config.img2txt_id != self.img2txt_id:
+            raise ValueError("parser model IDs must match the pinned projection")
+        expected_parser = MuseMindParserConfigV2(llm_id=self.llm_id, img2txt_id=self.img2txt_id)
+        if self.parser_config.model_dump() != expected_parser.model_dump():
+            raise ValueError("parser_config must match the pinned generation-v2 profile")
+        if self.similarity_threshold != 0.2 or self.vector_similarity_weight != 0.3 or self.pagerank != 0:
+            raise ValueError("retrieval fields must match the pinned generation-v2 profile")
+        return self
+
+
+class MuseMindDatasetCreateOrAdoptV2(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    contract_schema: Literal["musemind.ragflow-dataset-create-or-adopt/v2"] = Field(alias="schema", serialization_alias="schema")
+    dataset_id: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$"), Field(...)]
+    provider_projection: MuseMindDatasetProviderProjectionV2
+
+
 def canonical_dataset_projection_bytes(projection: dict[str, Any]) -> bytes:
     """Serialize a normalized provider projection using RFC 8785/JCS."""
     return rfc8785.dumps(projection)
@@ -77,14 +126,15 @@ def is_knowledgebase_primary_key_conflict(exc: BaseException) -> bool:
     return bool(re.search(r"(?:for key|key)\s+['`\"]?(?:knowledgebase\.)?PRIMARY['`\"]?", message, re.IGNORECASE))
 
 
-def normalized_dataset_projection(dataset: Any) -> dict[str, Any]:
+def normalized_dataset_projection(dataset: Any, schema: str = MUSEMIND_DATASET_PROJECTION_SCHEMA) -> dict[str, Any]:
     """Return only the allowlisted dataset projection used for identity equality."""
     return {
-        "schema": MUSEMIND_DATASET_PROJECTION_SCHEMA,
+        "schema": schema,
         "dataset_id": dataset.id,
         "name": dataset.name,
         "language": dataset.language,
         "embd_id": dataset.embd_id,
+        **({"llm_id": dataset.parser_config.get("llm_id"), "img2txt_id": dataset.parser_config.get("img2txt_id")} if schema == MUSEMIND_DATASET_PROJECTION_SCHEMA_V2 else {}),
         "parser_id": dataset.parser_id,
         "parser_config": dataset.parser_config,
         "similarity_threshold": dataset.similarity_threshold,
@@ -120,7 +170,7 @@ def create_or_adopt_dataset_identity(
     if dataset is None:
         return False, MUSEMIND_DATASET_COLLISION
 
-    actual = normalized_dataset_projection(dataset)
+    actual = normalized_dataset_projection(dataset, expected_projection.get("schema", MUSEMIND_DATASET_PROJECTION_SCHEMA))
     if dataset.tenant_embd_id != expected_tenant_embd_id or canonical_dataset_projection_bytes(actual) != canonical_dataset_projection_bytes(expected_projection):
         return False, MUSEMIND_DATASET_COLLISION
 

@@ -1,2 +1,4 @@
 *.sh text eol=lf
 docker/entrypoint.sh text eol=lf executable
+rag/prompts/vision_llm_describe_prompt.md text eol=crlf
+rag/prompts/vision_llm_figure_describe_prompt.md text eol=crlf

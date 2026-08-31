@@ -20,12 +20,28 @@ from PIL import Image
 
 from common.constants import LLMType
 from api.db.services.llm_service import LLMBundle
-from api.db.joint_services.tenant_model_service import get_tenant_default_model_by_type
+from api.db.joint_services.tenant_model_service import get_model_config_from_provider_instance, get_tenant_default_model_by_type
 from common.connection_utils import timeout
-from rag.app.picture import vision_llm_chunk as picture_vision_llm_chunk
+from rag.app.musemind_vision import vision_llm_chunk as picture_vision_llm_chunk
 from rag.prompts.generator import vision_llm_figure_describe_prompt, vision_llm_figure_describe_prompt_with_context
 from rag.nlp import append_context2table_image4pdf
 from rag.utils.lazy_image import ensure_pil_image, open_image_for_processing, is_image_like
+from rag.llm.musemind_gemini import MUSEMIND_GEMINI_IMAGE_ID
+
+
+def _pinned_vision_model_id(kwargs):
+    return (kwargs.get("parser_config") or {}).get("img2txt_id")
+
+
+def _vision_model_config(kwargs):
+    pinned_id = _pinned_vision_model_id(kwargs)
+    if pinned_id:
+        return get_model_config_from_provider_instance(kwargs["tenant_id"], LLMType.IMAGE2TEXT, pinned_id)
+    return get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+
+
+def _fail_closed_vision_path(kwargs, vision_model=None):
+    return _pinned_vision_model_id(kwargs) == MUSEMIND_GEMINI_IMAGE_ID or getattr(getattr(vision_model, "mdl", None), "content_free_observability", False) is True
 
 
 # need to delete before pr
@@ -50,10 +66,12 @@ def vision_figure_parser_docx_wrapper(sections, tbls, callback=None, **kwargs):
     if not sections:
         return tbls
     try:
-        vision_model_config = get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+        vision_model_config = _vision_model_config(kwargs)
         vision_model = LLMBundle(kwargs["tenant_id"], vision_model_config)
         callback(0.7, "Visual model detected. Attempting to enhance figure extraction...")
     except Exception:
+        if _fail_closed_vision_path(kwargs):
+            raise RuntimeError("Pinned image-description model resolution failed") from None
         vision_model = None
     if vision_model:
         figures_data = vision_figure_parser_figure_data_wrapper(sections)
@@ -62,6 +80,8 @@ def vision_figure_parser_docx_wrapper(sections, tbls, callback=None, **kwargs):
             boosted_figures = docx_vision_parser(callback=callback)
             tbls.extend(boosted_figures)
         except Exception as e:
+            if _fail_closed_vision_path(kwargs, vision_model):
+                raise RuntimeError("Pinned image-description request failed") from None
             callback(0.8, f"Visual model error: {e}. Skipping figure parsing enhancement.")
     return tbls
 
@@ -71,10 +91,12 @@ def vision_figure_parser_figure_xlsx_wrapper(images, callback=None, **kwargs):
     if not images:
         return []
     try:
-        vision_model_config = get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+        vision_model_config = _vision_model_config(kwargs)
         vision_model = LLMBundle(kwargs["tenant_id"], vision_model_config)
         callback(0.2, "Visual model detected. Attempting to enhance Excel image extraction...")
     except Exception:
+        if _fail_closed_vision_path(kwargs):
+            raise RuntimeError("Pinned image-description model resolution failed") from None
         vision_model = None
     if vision_model:
         figures_data = [
@@ -95,6 +117,8 @@ def vision_figure_parser_figure_xlsx_wrapper(images, callback=None, **kwargs):
             boosted_figures = parser(callback=callback)
             tbls.extend(boosted_figures)
         except Exception as e:
+            if _fail_closed_vision_path(kwargs, vision_model):
+                raise RuntimeError("Pinned image-description request failed") from None
             callback(0.25, f"Excel visual model error: {e}. Skipping vision enhancement.")
     return tbls
 
@@ -106,10 +130,12 @@ def vision_figure_parser_pdf_wrapper(tbls, callback=None, **kwargs):
     parser_config = kwargs.get("parser_config", {})
     context_size = max(0, int(parser_config.get("image_context_size", 0) or 0))
     try:
-        vision_model_config = get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+        vision_model_config = _vision_model_config(kwargs)
         vision_model = LLMBundle(kwargs["tenant_id"], vision_model_config)
         callback(0.7, "Visual model detected. Attempting to enhance figure extraction...")
     except Exception:
+        if _fail_closed_vision_path(kwargs):
+            raise RuntimeError("Pinned image-description model resolution failed") from None
         vision_model = None
     if vision_model:
 
@@ -137,6 +163,8 @@ def vision_figure_parser_pdf_wrapper(tbls, callback=None, **kwargs):
             tbls = [item for item in tbls if not is_figure_item(item)]
             tbls.extend(boosted_figures)
         except Exception as e:
+            if _fail_closed_vision_path(kwargs, vision_model):
+                raise RuntimeError("Pinned image-description request failed") from None
             callback(0.8, f"Visual model error: {e}. Skipping figure parsing enhancement.")
     return tbls
 
@@ -145,10 +173,12 @@ def vision_figure_parser_docx_wrapper_naive(chunks, idx_lst, callback=None, **kw
     if not chunks:
         return []
     try:
-        vision_model_config = get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+        vision_model_config = _vision_model_config(kwargs)
         vision_model = LLMBundle(kwargs["tenant_id"], vision_model_config)
         callback(0.7, "Visual model detected. Attempting to enhance figure extraction...")
     except Exception:
+        if _fail_closed_vision_path(kwargs):
+            raise RuntimeError("Pinned image-description model resolution failed") from None
         vision_model = None
     if vision_model:
 
@@ -166,8 +196,6 @@ def vision_figure_parser_docx_wrapper_naive(chunks, idx_lst, callback=None, **kw
                     context_below=ck.get("context_below"),
                 )
                 logging.info(f"[VisionFigureParser] figure={idx} context_above_len={len(context_above)} context_below_len={len(context_below)} prompt=with_context")
-                logging.info(f"[VisionFigureParser] figure={idx} context_above_snippet={context_above[:512]}")
-                logging.info(f"[VisionFigureParser] figure={idx} context_below_snippet={context_below[:512]}")
             else:
                 prompt = vision_llm_figure_describe_prompt()
                 logging.info(f"[VisionFigureParser] figure={idx} context_len=0 prompt=default")
@@ -201,8 +229,8 @@ shared_executor = ThreadPoolExecutor(max_workers=10)
 class VisionFigureParser:
     def __init__(self, vision_model, figures_data, *args, **kwargs):
         self.vision_model = vision_model
-        self.figure_contexts = kwargs.get("figure_contexts") or []
         self.context_size = max(0, int(kwargs.get("context_size", 0) or 0))
+        self.figure_contexts = (kwargs.get("figure_contexts") or []) if self.context_size else []
         self._extract_figures_info(figures_data)
         assert len(self.figures) == len(self.descriptions)
         assert not self.positions or (len(self.figures) == len(self.positions))
@@ -265,8 +293,6 @@ class VisionFigureParser:
                 logging.info(
                     f"[VisionFigureParser] figure={figure_idx} context_size={self.context_size} context_above_len={len(context_above)} context_below_len={len(context_below)} prompt=with_context"
                 )
-                logging.info(f"[VisionFigureParser] figure={figure_idx} context_above_snippet={context_above[:512]}")
-                logging.info(f"[VisionFigureParser] figure={figure_idx} context_below_snippet={context_below[:512]}")
             else:
                 prompt = vision_llm_figure_describe_prompt()
                 logging.info(f"[VisionFigureParser] figure={figure_idx} context_size={self.context_size} context_len=0 prompt=default")

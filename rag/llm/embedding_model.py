@@ -35,6 +35,17 @@ from rag.llm.key_utils import _normalize_replicate_key
 import logging
 import base64
 
+from rag.llm.musemind_gemini import (
+    EMBEDDING_DIMENSION,
+    EMBEDDING_IMAGE_BATCH_SIZE,
+    EMBEDDING_TEXT_BATCH_SIZE,
+    GeminiPassage,
+    MAX_TEXT_TOKENS,
+    image_mime_type,
+    is_musemind_gemini_embedding,
+    provider_http_options,
+)
+
 logger = logging.getLogger(__name__)
 
 # Standard token ceiling for the common 8K-context embedding models (OpenAI
@@ -757,8 +768,11 @@ class GeminiEmbed(Base):
 
         self.key = key
         self.model_name = model_name[7:] if model_name.startswith("models/") else model_name
-        self.client = genai.Client(api_key=self.key)
         self.types = types
+        self._musemind_generation_v2 = is_musemind_gemini_embedding(self.model_name, self._FACTORY_NAME)
+        self.manages_embedding_inputs = self._musemind_generation_v2
+        client_options = {"http_options": provider_http_options(types)} if self._musemind_generation_v2 else {}
+        self.client = genai.Client(api_key=self.key, **client_options)
 
     @staticmethod
     def _parse_embedding_vector(embedding):
@@ -802,6 +816,8 @@ class GeminiEmbed(Base):
             return self.types.EmbedContentConfig(task_type=task_type)
 
     def encode(self, texts: list):
+        if self._musemind_generation_v2:
+            return self._encode_generation_v2(texts, query=False)
         config = self._build_embedding_config()
 
         def _call(batch):
@@ -812,6 +828,9 @@ class GeminiEmbed(Base):
         return self._batched_encode(texts, _call, batch_size=16, truncate_to=2048)
 
     def encode_queries(self, text):
+        if self._musemind_generation_v2:
+            vectors, token_count = self._encode_generation_v2([text], query=True)
+            return vectors[0], token_count
         config = self._build_embedding_config()
         token_count = num_tokens_from_string(text)
         try:
@@ -824,6 +843,83 @@ class GeminiEmbed(Base):
         except Exception as _e:
             logger.exception("GeminiEmbed: query embedding request failed")
             raise EmbeddingError(f"Embedding request failed for GeminiEmbed. Error: {_e}") from _e
+
+    def _generation_v2_content(self, value, *, query: bool):
+        if isinstance(value, str) and value.startswith("data:"):
+            if query:
+                raise ValueError("Gemini query input must be text")
+            try:
+                header, encoded = value.split(",", 1)
+                declared_mime = header[5:].split(";", 1)[0]
+                if not header.endswith(";base64"):
+                    raise ValueError
+                data = base64.b64decode(encoded, validate=True)
+            except Exception:
+                raise ValueError("Gemini image data URL is invalid") from None
+            mime_type = image_mime_type(data)
+            if declared_mime != mime_type:
+                raise ValueError("Gemini image MIME does not match its bytes")
+            return self.types.Content(role="user", parts=[self.types.Part.from_bytes(data=data, mime_type=mime_type)]), 0, True
+        if isinstance(value, bytes):
+            if query:
+                raise ValueError("Gemini query input must be text")
+            mime_type = image_mime_type(value)
+            return self.types.Content(role="user", parts=[self.types.Part.from_bytes(data=value, mime_type=mime_type)]), 0, True
+
+        if isinstance(value, GeminiPassage):
+            if query:
+                raise ValueError("Gemini query input must be plain text")
+            if not isinstance(value.content, str) or not value.content.strip():
+                raise ValueError("Gemini embedding passage content is empty")
+            formatted = f"title: {value.title} | text: {value.content}"
+        elif isinstance(value, str):
+            if not value.strip():
+                raise ValueError("Gemini embedding text input is empty")
+            formatted = f"task: search result | query: {value}" if query else f"title:  | text: {value}"
+        else:
+            raise ValueError("Gemini embedding input must be text, passage, or image bytes")
+
+        token_count = num_tokens_from_string(formatted)
+        if token_count > MAX_TEXT_TOKENS:
+            raise ValueError("Gemini embedding text exceeds the 8192-token limit")
+        return self.types.Content(role="user", parts=[self.types.Part(text=formatted)]), token_count, False
+
+    @staticmethod
+    def _validate_generation_v2_vectors(vectors, expected_count: int) -> np.ndarray:
+        if len(vectors) != expected_count:
+            raise EmbeddingError("Gemini embedding response cardinality mismatch")
+        array = np.asarray(vectors, dtype=np.float32)
+        if array.shape != (expected_count, EMBEDDING_DIMENSION):
+            raise EmbeddingError("Gemini embedding response dimension mismatch")
+        if not np.isfinite(array).all():
+            raise EmbeddingError("Gemini embedding response contains non-finite values")
+        norms = np.linalg.norm(array, axis=1, keepdims=True)
+        if np.any(norms == 0):
+            raise EmbeddingError("Gemini embedding response contains a zero vector")
+        array = array / norms
+        if not np.isfinite(array).all():
+            raise EmbeddingError("Gemini embedding normalization failed")
+        return array.astype(np.float32, copy=False)
+
+    def _encode_generation_v2(self, values: list, *, query: bool):
+        if not values:
+            raise ValueError("Gemini embedding input is empty")
+        prepared = [self._generation_v2_content(value, query=query) for value in values]
+        used_tokens = sum(item[1] for item in prepared)
+        batch_size = EMBEDDING_IMAGE_BATCH_SIZE if any(item[2] for item in prepared) else EMBEDDING_TEXT_BATCH_SIZE
+        vectors = []
+        config = self.types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSION, auto_truncate=False)
+        try:
+            for start in range(0, len(prepared), batch_size):
+                contents = [item[0] for item in prepared[start : start + batch_size]]
+                response = self.client.models.embed_content(model=self.model_name, contents=contents, config=config)
+                vectors.extend(self._parse_embedding_response(response))
+        except (EmbeddingError, ValueError):
+            raise
+        except Exception:
+            logger.error("GeminiEmbed generation-v2 request failed", extra={"item_count": len(values)})
+            raise EmbeddingError("Gemini embedding request failed") from None
+        return self._validate_generation_v2_vectors(vectors, len(values)), used_tokens
 
 
 class NvidiaEmbed(Base):

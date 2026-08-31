@@ -296,8 +296,8 @@ COPY common common
 COPY memory memory
 COPY bin bin
 COPY tools/scripts tools/scripts
-COPY tools/musemind_conformance/__init__.py tools/musemind_conformance/jina_generation.py tools/musemind_conformance/
-RUN python3 -c "import tools.musemind_conformance.jina_generation"
+COPY tools/musemind_conformance/__init__.py tools/musemind_conformance/jina_generation.py tools/musemind_conformance/gemini_generation.py tools/musemind_conformance/
+RUN python3 -c "import tools.musemind_conformance.jina_generation, tools.musemind_conformance.gemini_generation"
 
 # Keep the exact SDK artifact inside the immutable application bundle. The RAG
 # Integration Service extracts and verifies this wheel by checksum; the server

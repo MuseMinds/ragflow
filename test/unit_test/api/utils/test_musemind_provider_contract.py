@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from api.utils.musemind_provider_contract import (
     MuseMindDatasetCreateOrAdoptV1,
+    MuseMindDatasetCreateOrAdoptV2,
     canonical_dataset_projection_bytes,
     is_knowledgebase_primary_key_conflict,
     prepare_exact_document_upload,
@@ -87,6 +88,42 @@ def test_exact_dataset_request_is_strict_and_expands_parser_defaults():
 
     assert model.dataset_id == "0123456789abcdef0123456789abcdef"
     assert model.provider_projection.parser_config.chunk_token_num == 512
+
+
+def test_generation_v2_request_pins_all_three_models_and_multimodal_parser_fields():
+    request = {
+        "schema": "musemind.ragflow-dataset-create-or-adopt/v2",
+        "dataset_id": "0123456789abcdef0123456789abcdef",
+        "provider_projection": {
+            "language": "Italian",
+            "embd_id": "gemini-embedding-2@musemind@Gemini",
+            "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+            "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+            "parser_id": "naive",
+            "parser_config": {
+                "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+                "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+                "overlapped_percent": 0,
+                "image_context_size": 0,
+            },
+            "similarity_threshold": 0.2,
+            "vector_similarity_weight": 0.3,
+            "pagerank": 0,
+            "pipeline_id": None,
+        },
+    }
+
+    model = MuseMindDatasetCreateOrAdoptV2(**request)
+
+    assert model.provider_projection.parser_config.layout_recognize == "DeepDOC"
+    assert model.provider_projection.parser_config.overlapped_percent == 0
+    assert model.provider_projection.parser_config.image_context_size == 0
+    assert model.provider_projection.parser_config.delimiter == "\n"
+    assert model.provider_projection.parser_config.raptor.prompt == "Summarize {cluster_content}"
+
+    request["provider_projection"]["parser_config"]["img2txt_id"] = "wrong"
+    with pytest.raises(ValidationError):
+        MuseMindDatasetCreateOrAdoptV2(**request)
 
 
 @pytest.mark.parametrize(

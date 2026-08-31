@@ -100,7 +100,7 @@ class RAGFlow:
         """Create or adopt the exact MuseMind dataset identity."""
         if re.fullmatch(r"[0-9a-f]{32}", dataset_id) is None:
             raise ValueError("dataset_id must be 32 lowercase hexadecimal characters")
-        required = {
+        required_v1 = {
             "language",
             "embd_id",
             "parser_id",
@@ -110,15 +110,21 @@ class RAGFlow:
             "pagerank",
             "pipeline_id",
         }
-        if set(provider_projection) != required:
-            raise ValueError("provider_projection must contain the exact v1 field set")
+        required_v2 = required_v1 | {"llm_id", "img2txt_id"}
+        fields = set(provider_projection)
+        if fields == required_v1:
+            contract_version = "v1"
+        elif fields == required_v2:
+            contract_version = "v2"
+        else:
+            raise ValueError("provider_projection must contain an exact supported field set")
         if provider_projection.get("pipeline_id") is not None:
             raise ValueError("pipeline_id must be null for the MuseMind pilot")
 
         response = self.post(
             "/datasets/musemind/exact",
             {
-                "schema": "musemind.ragflow-dataset-create-or-adopt/v1",
+                "schema": f"musemind.ragflow-dataset-create-or-adopt/{contract_version}",
                 "dataset_id": dataset_id,
                 "provider_projection": provider_projection,
             },

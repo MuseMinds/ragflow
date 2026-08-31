@@ -26,6 +26,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from rag.svr.task_executor_refactor.embedding_service import EmbeddingService
+from rag.llm.musemind_gemini import GeminiPassage, PRIVATE_IMAGE_FIELD
 
 
 class TestEmbeddingServiceInit:
@@ -59,6 +60,32 @@ class TestEmbeddingServiceEmbedChunks:
     The async implementation uses thread_pool_exec for model.encode calls.
     Tests mock thread_pool_exec at the module level to control returned vectors.
     """
+
+    @pytest.mark.asyncio
+    @patch("rag.svr.task_executor_refactor.embedding_service.thread_pool_exec", new_callable=AsyncMock)
+    async def test_gemini_multimodal_uses_image_only_and_removes_private_bytes(self, mock_thread_pool):
+        captured = []
+
+        def encode(_func, inputs):
+            captured.extend(inputs)
+            return np.ones((len(inputs), 3072), dtype=np.float32), 7
+
+        mock_thread_pool.side_effect = encode
+        ctx = MagicMock(progress_cb=None, embed_limiter=AsyncMockLimiter())
+        service = EmbeddingService(ctx=ctx, embedding_batch_size=10)
+        model = MagicMock()
+        model.mdl.manages_embedding_inputs = True
+        docs = [
+            {"docnm_kwd": "text-title", "content_with_weight": "text-content"},
+            {"docnm_kwd": "must-not-mix", "content_with_weight": "must-not-embed", PRIVATE_IMAGE_FIELD: b"\xff\xd8\xffsynthetic"},
+        ]
+
+        tokens, dimension = await service.embed_chunks(docs, model)
+
+        assert tokens == 7
+        assert dimension == 3072
+        assert captured == [GeminiPassage("text-title", "text-content"), b"\xff\xd8\xffsynthetic"]
+        assert PRIVATE_IMAGE_FIELD not in docs[1]
 
     @pytest.mark.asyncio
     @patch("rag.svr.task_executor_refactor.embedding_service.thread_pool_exec", new_callable=AsyncMock)

@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 from peewee import IntegrityError
 
 from api.db.musemind_provider_identity import reconcile_provider_identity
+from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV2
 from common.constants import LLMType
 from test.unit_test.api.db.test_musemind_provider_identity import MemoryStore, make_spec
 
@@ -52,6 +53,24 @@ def _request():
             "pipeline_id": None,
         },
     }
+
+
+def _request_v2():
+    request = _request()
+    request["provider_projection"].update(
+        embd_id="gemini-embedding-2@musemind@Gemini",
+        llm_id="gemini-3.1-flash-lite@musemind@Gemini",
+        img2txt_id="gemini-3.5-flash@musemind@Gemini",
+        parser_config={
+            "chunk_token_num": 512,
+            "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+            "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+            "image_context_size": 0,
+            "overlapped_percent": 0,
+        },
+    )
+    request["schema"] = "musemind.ragflow-dataset-create-or-adopt/v2"
+    return MuseMindDatasetCreateOrAdoptV2(**request).model_dump(by_alias=True)
 
 
 def _load_service(monkeypatch, *, resolver, save, tenant=None, expected_tenant_id="tenant-1"):
@@ -195,3 +214,44 @@ def test_reconciled_one_shot_state_allows_exact_route_with_null_legacy_field(mon
     assert success is True
     assert result["outcome"] == "CREATED"
     assert saved["tenant_embd_id"] is None
+
+
+def test_generation_v2_validates_three_registry_rows_and_exact_readback(monkeypatch):
+    tenant = SimpleNamespace(
+        embd_id="gemini-embedding-2@musemind@Gemini",
+        tenant_embd_id=None,
+        llm_id="gemini-3.1-flash-lite@musemind@Gemini",
+        img2txt_id="gemini-3.5-flash@musemind@Gemini",
+    )
+    resolver = MagicMock(return_value={"llm_factory": "Gemini"})
+    module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1, tenant=tenant)
+
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_v2())
+
+    assert success is True
+    assert result["provider_projection"]["schema"] == "musemind.ragflow-dataset-provider-projection/v2"
+    assert result["provider_projection"]["llm_id"] == tenant.llm_id
+    assert result["provider_projection"]["img2txt_id"] == tenant.img2txt_id
+    assert saved["parser_config"]["table_context_size"] == 0
+    assert saved["parser_config"]["children_delimiter"] == ""
+    assert [call.args[1] for call in resolver.call_args_list] == [LLMType.EMBEDDING, LLMType.CHAT, LLMType.IMAGE2TEXT]
+
+
+def test_generation_v2_uses_registry_rows_when_tenant_defaults_differ(monkeypatch):
+    tenant = SimpleNamespace(
+        embd_id="legacy-default@other@Jina",
+        tenant_embd_id=None,
+        llm_id="mutable-chat-default@other@OpenAI",
+        img2txt_id="mutable-vision-default@other@OpenAI",
+    )
+    resolver = MagicMock(return_value={"llm_factory": "Gemini"})
+    module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1, tenant=tenant)
+
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_v2())
+
+    projection = _request_v2()["provider_projection"]
+    assert success is True
+    assert result["outcome"] == "CREATED"
+    assert saved["embd_id"] == projection["embd_id"]
+    assert saved["parser_config"]["llm_id"] == projection["llm_id"]
+    assert saved["parser_config"]["img2txt_id"] == projection["img2txt_id"]
