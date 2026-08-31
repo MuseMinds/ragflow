@@ -41,6 +41,7 @@ from common.float_utils import normalize_overlapped_percent
 from rag.nlp import search
 from rag.svr.task_executor_refactor.task_context import TaskContext
 from rag.utils.base64_image import image2id
+from rag.llm.musemind_gemini import should_retain_pdf_image_for_embedding
 
 from api.db.services.task_service import TaskService
 from rag.svr.task_executor_refactor.constants import GRAPH_RAPTOR_FAKE_DOC_ID
@@ -203,14 +204,12 @@ class ChunkService:
                     docs.append(d)
                     return
 
-                from rag.llm.musemind_gemini import MUSEMIND_GEMINI_EMBEDDING_ID
-
                 await image2id(
                     d,
                     partial(settings.STORAGE_IMPL.put, tenant_id=ctx.tenant_id),
                     d["id"],
                     ctx.kb_id,
-                    retain_for_embedding=ctx.embd_id == MUSEMIND_GEMINI_EMBEDDING_ID,
+                    retain_for_embedding=should_retain_pdf_image_for_embedding(ctx.embd_id, ctx.raw_task.get("type")),
                 )
                 docs.append(d)
             except Exception:

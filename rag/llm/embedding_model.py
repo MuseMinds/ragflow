@@ -869,8 +869,12 @@ class GeminiEmbed(Base):
         if isinstance(value, GeminiPassage):
             if query:
                 raise ValueError("Gemini query input must be plain text")
+            if not isinstance(value.content, str) or not value.content.strip():
+                raise ValueError("Gemini embedding passage content is empty")
             formatted = f"title: {value.title} | text: {value.content}"
         elif isinstance(value, str):
+            if not value.strip():
+                raise ValueError("Gemini embedding text input is empty")
             formatted = f"task: search result | query: {value}" if query else f"title:  | text: {value}"
         else:
             raise ValueError("Gemini embedding input must be text, passage, or image bytes")
@@ -899,7 +903,7 @@ class GeminiEmbed(Base):
 
     def _encode_generation_v2(self, values: list, *, query: bool):
         if not values:
-            return np.empty((0, EMBEDDING_DIMENSION), dtype=np.float32), 0
+            raise ValueError("Gemini embedding input is empty")
         prepared = [self._generation_v2_content(value, query=query) for value in values]
         used_tokens = sum(item[1] for item in prepared)
         batch_size = EMBEDDING_IMAGE_BATCH_SIZE if any(item[2] for item in prepared) else EMBEDDING_TEXT_BATCH_SIZE

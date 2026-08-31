@@ -160,6 +160,8 @@ class LLMBundle(LLM4Tenant):
 
     def encode_queries(self, query: str):
         managed_inputs = getattr(self.mdl, "manages_embedding_inputs", False) is True
+        if managed_inputs and (query is None or not str(query).strip()):
+            raise ValueError("Managed embedding query input is empty")
         if self.langfuse:
             trace_input = {"item_count": 1, "content_omitted": True} if managed_inputs else {"query": query}
             generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="encode_queries", model=self.model_config["llm_name"], input=trace_input)

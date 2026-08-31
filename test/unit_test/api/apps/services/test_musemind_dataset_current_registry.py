@@ -235,3 +235,23 @@ def test_generation_v2_validates_three_registry_rows_and_exact_readback(monkeypa
     assert saved["parser_config"]["table_context_size"] == 0
     assert saved["parser_config"]["children_delimiter"] == ""
     assert [call.args[1] for call in resolver.call_args_list] == [LLMType.EMBEDDING, LLMType.CHAT, LLMType.IMAGE2TEXT]
+
+
+def test_generation_v2_uses_registry_rows_when_tenant_defaults_differ(monkeypatch):
+    tenant = SimpleNamespace(
+        embd_id="legacy-default@other@Jina",
+        tenant_embd_id=None,
+        llm_id="mutable-chat-default@other@OpenAI",
+        img2txt_id="mutable-vision-default@other@OpenAI",
+    )
+    resolver = MagicMock(return_value={"llm_factory": "Gemini"})
+    module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1, tenant=tenant)
+
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_v2())
+
+    projection = _request_v2()["provider_projection"]
+    assert success is True
+    assert result["outcome"] == "CREATED"
+    assert saved["embd_id"] == projection["embd_id"]
+    assert saved["parser_config"]["llm_id"] == projection["llm_id"]
+    assert saved["parser_config"]["img2txt_id"] == projection["img2txt_id"]

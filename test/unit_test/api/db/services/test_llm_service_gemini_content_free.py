@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from api.db.services.llm_service import LLMBundle
 from rag.llm.musemind_gemini import GeminiPassage
@@ -59,3 +60,17 @@ def test_managed_gemini_cv_omits_prompt_and_output_from_trace():
     assert calls[0]["metadata"] == {"model": "pinned"}
     assert observation.updates == [{"output": {"content_omitted": True}, "usage_details": {"total_tokens": 4}}]
     assert "secret" not in repr(calls)
+
+
+def test_managed_gemini_empty_query_is_rejected_without_trace_or_provider_call():
+    model = SimpleNamespace(
+        manages_embedding_inputs=True,
+        encode_queries=lambda _query: (_ for _ in ()).throw(AssertionError("provider called")),
+    )
+    bundle, observation, calls = _bundle(model)
+
+    with pytest.raises(ValueError, match="empty"):
+        bundle.encode_queries("   ")
+
+    assert calls == []
+    assert observation.ended is False

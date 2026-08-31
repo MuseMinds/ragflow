@@ -1,9 +1,12 @@
+import hashlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
 from rag.llm.cv_model import GeminiCV
+from rag.llm.musemind_gemini import FIGURE_PROMPT_SHA256, PAGE_PROMPT_SHA256, REQUEST_TIMEOUT_MS
 
 
 class FakeModels:
@@ -45,7 +48,14 @@ def test_gemini_cv_pins_deterministic_config_prompt_identity_and_image_mime():
     assert config.top_p == 1.0
     assert config.thinking_config.thinking_budget == 0
     assert config.tools is None
-    assert client_kwargs["http_options"].timeout == 10_000
+    assert client_kwargs["http_options"].timeout == REQUEST_TIMEOUT_MS
+
+
+def test_gemini_cv_runtime_prompt_bytes_match_adr_0078_checksums():
+    prompt_dir = Path(__file__).resolve().parents[4] / "rag" / "prompts"
+
+    assert hashlib.sha256((prompt_dir / "vision_llm_figure_describe_prompt.md").read_bytes()).hexdigest() == FIGURE_PROMPT_SHA256
+    assert hashlib.sha256((prompt_dir / "vision_llm_describe_prompt.md").read_bytes()).hexdigest() == PAGE_PROMPT_SHA256
 
 
 def test_gemini_cv_rejects_unsupported_image_without_provider_call():

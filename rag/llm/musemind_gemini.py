@@ -19,8 +19,12 @@ EMBEDDING_IMAGE_BATCH_SIZE = 6
 MAX_TEXT_TOKENS = 8192
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 RETRYABLE_HTTP_STATUSES = (408, 429, 500, 502, 503, 504)
+# ADR-0078 pins three exact 10-second attempts and a 30-second total deadline.
+# google-genai 1.55.0 applies Tenacity waits outside each HTTP timeout.
 REQUEST_TIMEOUT_MS = 10_000
 REQUEST_ATTEMPTS = 3
+SDK_ZERO_WAIT_SENTINEL = -1.0
+TOTAL_DEADLINE_MS = 30_000
 PRIVATE_IMAGE_FIELD = "_musemind_embedding_image"
 
 FIGURE_PROMPT_SHA256 = "97042f2f5ffa00cd18065e32b74841aa1a507bcd4c9a76d954dc0c91d42bab59"
@@ -42,7 +46,7 @@ def is_musemind_gemini_embedding(model_name: str | None, factory: str | None = N
 def image_mime_type(data: bytes) -> str:
     """Validate generation-v2 image bytes without decoding or rewriting them."""
     if not isinstance(data, bytes):
-        raise ValueError("Gemini image input must be bytes")
+        raise ValueError("Gemini image input must be bytes")  # noqa: TRY004 - exact contract uses one validation exception type
     if not data:
         raise ValueError("Gemini image input is empty")
     if len(data) > MAX_IMAGE_BYTES:
@@ -54,18 +58,25 @@ def image_mime_type(data: bytes) -> str:
     raise ValueError("Gemini image input must be JPEG or PNG")
 
 
+def should_retain_pdf_image_for_embedding(embedding_id: str | None, document_type: str | None) -> bool:
+    """Retain transient figure bytes only for the pinned v2 PDF path."""
+    return embedding_id == MUSEMIND_GEMINI_EMBEDDING_ID and document_type == "pdf"
+
+
 def provider_http_options(types):
     """Return the bounded retry/timeout policy shared by the pinned Gemini models."""
     return types.HttpOptions(
         timeout=REQUEST_TIMEOUT_MS,
         retry_options=types.HttpRetryOptions(
             attempts=REQUEST_ATTEMPTS,
-            # The contract's 30-second total deadline is three 10-second
-            # attempts; retry sleeps must not extend it.
-            initial_delay=0.0,
-            max_delay=0.0,
-            exp_base=2.0,
-            jitter=0.0,
+            # google-genai 1.55.0 uses ``value or default`` and would replace
+            # literal zero with SDK defaults. Truthy negative sentinels reach
+            # Tenacity unchanged; wait_exponential_jitter clamps them to exact
+            # zero, so the three 10-second attempts remain the full deadline.
+            initial_delay=SDK_ZERO_WAIT_SENTINEL,
+            max_delay=SDK_ZERO_WAIT_SENTINEL,
+            exp_base=1.0,
+            jitter=SDK_ZERO_WAIT_SENTINEL,
             http_status_codes=list(RETRYABLE_HTTP_STATUSES),
         ),
     )

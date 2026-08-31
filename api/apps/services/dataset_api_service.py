@@ -125,7 +125,14 @@ async def create_dataset(tenant_id: str, req: dict):
 
 def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection: dict) -> tuple[dict, dict, int | None]:
     exists, tenant = TenantService.get_by_id(tenant_id)
-    if not exists or tenant.embd_id != projection["embd_id"]:
+    if not exists:
+        raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
+
+    is_v2 = "llm_id" in projection
+    # Generation v1 deliberately preserves the historical tenant-default
+    # check. Generation v2 authority is the immutable three-row registry and
+    # the dataset-pinned parser configuration, not mutable tenant defaults.
+    if not is_v2 and tenant.embd_id != projection["embd_id"]:
         raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
 
     try:
@@ -137,10 +144,7 @@ def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection
         raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID) from exc
 
     parser_config = get_parser_config(projection["parser_id"], projection["parser_config"])
-    is_v2 = "llm_id" in projection
     if is_v2:
-        if tenant.llm_id != projection["llm_id"] or tenant.img2txt_id != projection["img2txt_id"]:
-            raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
         parser_config["llm_id"] = projection["llm_id"]
         parser_config["img2txt_id"] = projection["img2txt_id"]
         parser_config["table_context_size"] = 0

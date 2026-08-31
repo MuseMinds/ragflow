@@ -10,9 +10,16 @@ class FakeEmbedding:
     def __init__(self, key, model):
         assert key == "AIza" + "x" * 60
         assert model == "gemini-embedding-2"
+        self.encode_calls = 0
 
-    def encode(self, passages):
-        assert len(passages) == 1
+    def encode(self, inputs):
+        assert len(inputs) == 1
+        self.encode_calls += 1
+        if self.encode_calls == 1:
+            assert inputs[0].title == "synthetic"
+            assert inputs[0].content == "synthetic"
+        else:
+            assert inputs[0].startswith(b"\x89PNG\r\n\x1a\n")
         return np.ones((1, 3072), dtype=np.float32), 1
 
     def encode_queries(self, query):

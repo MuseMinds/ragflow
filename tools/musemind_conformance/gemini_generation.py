@@ -13,10 +13,10 @@ from api.db.musemind_provider_identity import ReconciliationConflict, read_secre
 from rag.llm.embedding_model import GeminiEmbed
 from rag.llm.musemind_gemini import (
     EMBEDDING_DIMENSION,
-    GeminiPassage,
     MUSEMIND_GEMINI_CHAT_MODEL,
     MUSEMIND_GEMINI_EMBEDDING_MODEL,
     MUSEMIND_GEMINI_IMAGE_MODEL,
+    GeminiPassage,
     provider_http_options,
 )
 
@@ -36,8 +36,9 @@ def run_probe(
 
     embedding = embedding_factory(api_key, MUSEMIND_GEMINI_EMBEDDING_MODEL)
     passage_vectors, _ = embedding.encode([GeminiPassage(title="synthetic", content="synthetic")])
+    image_vectors, _ = embedding.encode([_PNG])
     query_vector, _ = embedding.encode_queries("synthetic")
-    if passage_vectors.shape != (1, EMBEDDING_DIMENSION) or query_vector.shape != (EMBEDDING_DIMENSION,):
+    if passage_vectors.shape != (1, EMBEDDING_DIMENSION) or image_vectors.shape != (1, EMBEDDING_DIMENSION) or query_vector.shape != (EMBEDDING_DIMENSION,):
         raise RuntimeError("Gemini probe dimension mismatch")
 
     factory = client_factory or genai.Client
@@ -81,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReconciliationConflict as exc:
         result = {"schema_version": SCHEMA_VERSION, "outcome": "FAILED", "reason_code": exc.reason_code}
         exit_code = 2
-    except Exception:
+    except Exception:  # noqa: BLE001 - probe output must collapse all provider failures to one content-free code
         result = {"schema_version": SCHEMA_VERSION, "outcome": "FAILED", "reason_code": "GEMINI_PROBE_FAILED"}
         exit_code = 2
     serialized = json.dumps(result, sort_keys=True)

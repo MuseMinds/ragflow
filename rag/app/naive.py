@@ -112,6 +112,13 @@ def _normalize_section_text_for_rtl_presentation_forms(sections):
     return normalized_sections
 
 
+def _vision_model_config(tenant_id, parser_config):
+    pinned_id = (parser_config or {}).get("img2txt_id")
+    if pinned_id:
+        return get_model_config_from_provider_instance(tenant_id, LLMType.IMAGE2TEXT, pinned_id)
+    return get_tenant_default_model_by_type(tenant_id, LLMType.IMAGE2TEXT)
+
+
 def by_deepdoc(filename, binary=None, from_page=0, to_page=MAXIMUM_PAGE_NUMBER, lang="Chinese", callback=None, pdf_cls=None, **kwargs):
     callback = callback
     binary = binary
@@ -161,7 +168,7 @@ def by_mineru(
                 # no vision model is available.
                 if "vision_model" not in kwargs:
                     try:
-                        vision_model_config = get_tenant_default_model_by_type(tenant_id, LLMType.IMAGE2TEXT)
+                        vision_model_config = _vision_model_config(tenant_id, kwargs.get("parser_config"))
                         kwargs["vision_model"] = LLMBundle(tenant_id=tenant_id, model_config=vision_model_config, lang=lang)
                     except Exception as vlm_err:
                         logging.info(f"[MinerU] no IMAGE2TEXT model for tenant; skipping image VLM enhancement: {vlm_err}")
@@ -1082,7 +1089,7 @@ def chunk(filename, binary=None, from_page=0, to_page=MAXIMUM_PAGE_NUMBER, lang=
         is_markdown = True
 
         try:
-            vision_model_config = get_tenant_default_model_by_type(kwargs["tenant_id"], LLMType.IMAGE2TEXT)
+            vision_model_config = _vision_model_config(kwargs["tenant_id"], parser_config)
             vision_model = LLMBundle(kwargs["tenant_id"], vision_model_config)
             callback(0.2, "Visual model detected. Attempting to enhance figure extraction...")
         except Exception as e:

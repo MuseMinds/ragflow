@@ -27,14 +27,16 @@
   with input order and output shape preserved.
 """
 
-import json
 import base64
+import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
+from common.exceptions import ModelException
+from common.token_utils import num_tokens_from_string
 from rag.llm.embedding_model import (
     DEFAULT_MAX_TOKENS,
     BedrockEmbed,
@@ -48,9 +50,15 @@ from rag.llm.embedding_model import (
     OpenAIEmbed,
     ZhipuEmbed,
 )
-from rag.llm.musemind_gemini import GeminiPassage, RETRYABLE_HTTP_STATUSES
-from common.exceptions import ModelException
-from common.token_utils import num_tokens_from_string
+from rag.llm.musemind_gemini import (
+    REQUEST_ATTEMPTS,
+    REQUEST_TIMEOUT_MS,
+    RETRYABLE_HTTP_STATUSES,
+    TOTAL_DEADLINE_MS,
+    GeminiPassage,
+    provider_http_options,
+    should_retain_pdf_image_for_embedding,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -111,9 +119,53 @@ def test_gemini_generation_v2_uses_typed_exact_text_and_image_contents():
         assert call["config"].auto_truncate is False
         assert call["config"].output_dimensionality == 3072
     retry = client_kwargs["http_options"].retry_options
-    assert client_kwargs["http_options"].timeout == 10_000
+    assert client_kwargs["http_options"].timeout == REQUEST_TIMEOUT_MS
     assert retry.attempts == 3
     assert tuple(retry.http_status_codes) == RETRYABLE_HTTP_STATUSES
+
+
+def test_gemini_generation_v2_google_sdk_retry_budget_matches_total_deadline():
+    from google.genai import types
+    from google.genai._api_client import retry_args
+
+    options = provider_http_options(types)
+    actual = retry_args(options.retry_options)
+    states = [SimpleNamespace(attempt_number=attempt) for attempt in range(1, REQUEST_ATTEMPTS + 1)]
+    waits = [actual["wait"](state) for state in states[:-1]]
+
+    assert [actual["stop"](state) for state in states] == [False, False, True]
+    assert waits == [0, 0]
+    assert REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS + sum(waits) * 1000 == TOTAL_DEADLINE_MS
+
+
+@pytest.mark.parametrize("value", ["", "   ", GeminiPassage("title", "\t")])
+def test_gemini_generation_v2_rejects_empty_text_before_provider(value):
+    embed, models, _ = _make_gemini()
+
+    with pytest.raises(ValueError, match="empty"):
+        embed.encode([value])
+
+    assert models.calls == []
+
+
+def test_gemini_generation_v2_rejects_empty_batch_and_query_before_provider():
+    embed, models, _ = _make_gemini()
+
+    with pytest.raises(ValueError, match="empty"):
+        embed.encode([])
+    with pytest.raises(ValueError, match="empty"):
+        embed.encode_queries("   ")
+
+    assert models.calls == []
+
+
+def test_gemini_private_image_retention_is_pdf_only():
+    exact_id = "gemini-embedding-2@musemind@Gemini"
+
+    assert should_retain_pdf_image_for_embedding(exact_id, "pdf") is True
+    assert should_retain_pdf_image_for_embedding(exact_id, "doc") is False
+    assert should_retain_pdf_image_for_embedding(exact_id, "visual") is False
+    assert should_retain_pdf_image_for_embedding("jina-embeddings-v3@musemind@Jina", "pdf") is False
 
 
 def test_gemini_generation_v2_rejects_invalid_image_and_dimension():

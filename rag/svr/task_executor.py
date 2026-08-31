@@ -45,7 +45,7 @@ from api.db.joint_services.memory_message_service import handle_save_to_memory_t
 from common.connection_utils import timeout
 from common.metadata_utils import turn2jsonschema, update_metadata_to
 from rag.utils.base64_image import image2id
-from rag.llm.musemind_gemini import GeminiPassage, MUSEMIND_GEMINI_EMBEDDING_ID, PRIVATE_IMAGE_FIELD
+from rag.llm.musemind_gemini import GeminiPassage, PRIVATE_IMAGE_FIELD, should_retain_pdf_image_for_embedding
 from rag.utils.raptor_utils import (
     collect_raptor_chunk_ids,
     collect_raptor_methods,
@@ -401,7 +401,7 @@ async def build_chunks(task, progress_callback):
                 partial(settings.STORAGE_IMPL.put, tenant_id=task["tenant_id"]),
                 d["id"],
                 task["kb_id"],
-                retain_for_embedding=task.get("embd_id") == MUSEMIND_GEMINI_EMBEDDING_ID,
+                retain_for_embedding=should_retain_pdf_image_for_embedding(task.get("embd_id"), task.get("type")),
             )
             docs.append(d)
         except Exception:
