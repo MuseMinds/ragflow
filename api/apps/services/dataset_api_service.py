@@ -33,6 +33,7 @@ from common.constants import FileSource, LLMType, StatusEnum
 from api.utils.api_utils import deep_merge, get_parser_config, remap_dictionary_keys, verify_embedding_availability
 from api.utils.musemind_provider_contract import (
     MUSEMIND_DATASET_PROJECTION_SCHEMA,
+    MUSEMIND_DATASET_PROJECTION_SCHEMA_V2,
     canonical_dataset_projection_bytes,
     create_or_adopt_dataset_identity,
 )
@@ -129,11 +130,23 @@ def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection
 
     try:
         get_model_config_from_provider_instance(tenant_id, LLMType.EMBEDDING, projection["embd_id"])
+        if "llm_id" in projection:
+            get_model_config_from_provider_instance(tenant_id, LLMType.CHAT, projection["llm_id"])
+            get_model_config_from_provider_instance(tenant_id, LLMType.IMAGE2TEXT, projection["img2txt_id"])
     except Exception as exc:
         raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID) from exc
 
     parser_config = get_parser_config(projection["parser_id"], projection["parser_config"])
-    parser_config["llm_id"] = tenant.llm_id
+    is_v2 = "llm_id" in projection
+    if is_v2:
+        if tenant.llm_id != projection["llm_id"] or tenant.img2txt_id != projection["img2txt_id"]:
+            raise ValueError(_MUSEMIND_DATASET_CONFIG_INVALID)
+        parser_config["llm_id"] = projection["llm_id"]
+        parser_config["img2txt_id"] = projection["img2txt_id"]
+        parser_config["table_context_size"] = 0
+        parser_config["children_delimiter"] = ""
+    else:
+        parser_config["llm_id"] = tenant.llm_id
     payload = {
         "id": dataset_id,
         "name": f"mm-{dataset_id}",
@@ -154,11 +167,12 @@ def _prepare_musemind_dataset_insert(tenant_id: str, dataset_id: str, projection
         "pipeline_id": projection["pipeline_id"],
     }
     expected = {
-        "schema": MUSEMIND_DATASET_PROJECTION_SCHEMA,
+        "schema": MUSEMIND_DATASET_PROJECTION_SCHEMA_V2 if is_v2 else MUSEMIND_DATASET_PROJECTION_SCHEMA,
         "dataset_id": dataset_id,
         "name": payload["name"],
         "language": payload["language"],
         "embd_id": payload["embd_id"],
+        **({"llm_id": projection["llm_id"], "img2txt_id": projection["img2txt_id"]} if is_v2 else {}),
         "parser_id": payload["parser_id"],
         "parser_config": payload["parser_config"],
         "similarity_threshold": payload["similarity_threshold"],

@@ -102,8 +102,18 @@ class LLMBundle(LLM4Tenant):
         self.mdl.bind_tools(toolcall_session, tools)
 
     def encode(self, texts: list):
+        managed_inputs = getattr(self.mdl, "manages_embedding_inputs", False) is True
         if self.langfuse:
-            generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="encode", model=self.model_config["llm_name"], input={"texts": texts})
+            trace_input = {"item_count": len(texts), "content_omitted": True} if managed_inputs else {"texts": texts}
+            generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="encode", model=self.model_config["llm_name"], input=trace_input)
+
+        if managed_inputs:
+            embeddings, used_tokens = self.mdl.encode(texts)
+            logging.info("LLMBundle.encode used_tokens: %d", used_tokens)
+            if self.langfuse:
+                generation.update(usage_details={"total_tokens": used_tokens})
+                generation.end()
+            return embeddings, used_tokens
 
         safe_texts = []
         for idx, text in enumerate(texts):
@@ -149,8 +159,10 @@ class LLMBundle(LLM4Tenant):
         return embeddings, used_tokens
 
     def encode_queries(self, query: str):
+        managed_inputs = getattr(self.mdl, "manages_embedding_inputs", False) is True
         if self.langfuse:
-            generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="encode_queries", model=self.model_config["llm_name"], input={"query": query})
+            trace_input = {"item_count": 1, "content_omitted": True} if managed_inputs else {"query": query}
+            generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="encode_queries", model=self.model_config["llm_name"], input=trace_input)
 
         if query is None or not str(query).strip():
             marker = "None" if query is None else "whitespace-only"
@@ -191,6 +203,7 @@ class LLMBundle(LLM4Tenant):
         return sim, used_tokens
 
     def describe(self, image, max_tokens=300):
+        content_free = getattr(self.mdl, "content_free_observability", False) is True
         if self.langfuse:
             generation = self._start_langfuse_observation(trace_context=self.trace_context, as_type="generation", name="describe", metadata={"model": self.model_config["llm_name"]})
 
@@ -198,22 +211,26 @@ class LLMBundle(LLM4Tenant):
         logging.info("LLMBundle.describe used_tokens: %d", used_tokens)
 
         if self.langfuse:
-            generation.update(output={"output": txt}, usage_details={"total_tokens": used_tokens})
+            generation.update(output={"content_omitted": True} if content_free else {"output": txt}, usage_details={"total_tokens": used_tokens})
             generation.end()
 
         return txt
 
     def describe_with_prompt(self, image, prompt):
+        content_free = getattr(self.mdl, "content_free_observability", False) is True
         if self.langfuse:
+            metadata = {"model": self.model_config["llm_name"]}
+            if not content_free:
+                metadata["prompt"] = prompt
             generation = self._start_langfuse_observation(
-                trace_context=self.trace_context, as_type="generation", name="describe_with_prompt", metadata={"model": self.model_config["llm_name"], "prompt": prompt}
+                trace_context=self.trace_context, as_type="generation", name="describe_with_prompt", metadata=metadata
             )
 
         txt, used_tokens = self.mdl.describe_with_prompt(image, prompt)
         logging.info("LLMBundle.describe_with_prompt used_tokens: %d", used_tokens)
 
         if self.langfuse:
-            generation.update(output={"output": txt}, usage_details={"total_tokens": used_tokens})
+            generation.update(output={"content_omitted": True} if content_free else {"output": txt}, usage_details={"total_tokens": used_tokens})
             generation.end()
 
         return txt

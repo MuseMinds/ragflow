@@ -57,8 +57,9 @@ jobs:
           ! grep -Eq 'git clone .*infiniflow/resource' Dockerfile
           grep -Fq 'uv build --wheel --no-build-isolation ./sdk/python --out-dir /ragflow/sdk-dist' Dockerfile
           grep -Fq 'COPY --from=builder /ragflow/sdk-dist /ragflow/sdk-dist' Dockerfile
-          grep -Fq 'COPY tools/musemind_conformance/__init__.py tools/musemind_conformance/jina_generation.py tools/musemind_conformance/' Dockerfile
-          grep -Fq 'RUN python3 -c "import tools.musemind_conformance.jina_generation"' Dockerfile
+          grep -Fq 'COPY tools/musemind_conformance/__init__.py tools/musemind_conformance/jina_generation.py tools/musemind_conformance/gemini_generation.py tools/musemind_conformance/' Dockerfile
+          grep -Fq 'tools/musemind_conformance/gemini_generation.py' Dockerfile
+          grep -Fq 'RUN python3 -c "import tools.musemind_conformance.jina_generation, tools.musemind_conformance.gemini_generation"' Dockerfile
           grep -Fq 'test -s /ragflow/VERSION' Dockerfile
           grep -Fq 'apt-get purge -y nodejs libssl1.1' Dockerfile
           grep -Fq '/ragflow/tika-server-standard-3.3.0.jar' Dockerfile
@@ -140,12 +141,22 @@ jobs:
           api/apps/restful_apis/document_api.py
           api/apps/services/dataset_api_service.py
           api/db/musemind_provider_identity.py
+          api/db/services/llm_service.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
           agent/sandbox/client.py
           agent/sandbox/providers/__init__.py
           rag/llm/chat_model.py
           rag/llm/embedding_model.py
+          rag/llm/cv_model.py
+          rag/llm/musemind_gemini.py
+          rag/svr/task_executor.py
+          rag/svr/task_executor_refactor/chunk_service.py
+          rag/svr/task_executor_refactor/embedding_service.py
+          rag/utils/base64_image.py
+          deepdoc/parser/mineru_parser.py
+          deepdoc/parser/figure_parser.py
+          rag/app/picture.py
           rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
@@ -154,6 +165,7 @@ jobs:
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
           tools/musemind_conformance/jina_generation.py
+          tools/musemind_conformance/gemini_generation.py
 
       - name: Lint MuseMind provider contract sources
         run: >-
@@ -164,12 +176,22 @@ jobs:
           api/apps/restful_apis/document_api.py
           api/apps/services/dataset_api_service.py
           api/db/musemind_provider_identity.py
+          api/db/services/llm_service.py
           api/db/services/file_service.py
           api/utils/musemind_provider_contract.py
           agent/sandbox/client.py
           agent/sandbox/providers/__init__.py
           rag/llm/chat_model.py
           rag/llm/embedding_model.py
+          rag/llm/cv_model.py
+          rag/llm/musemind_gemini.py
+          rag/svr/task_executor.py
+          rag/svr/task_executor_refactor/chunk_service.py
+          rag/svr/task_executor_refactor/embedding_service.py
+          rag/utils/base64_image.py
+          deepdoc/parser/mineru_parser.py
+          deepdoc/parser/figure_parser.py
+          rag/app/picture.py
           rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
           sdk/python/ragflow_sdk/modules/dataset.py
@@ -181,23 +203,33 @@ jobs:
           test/unit_test/api/db/joint_services/test_tenant_model_service_max_tokens.py
           test/unit_test/api/db/test_musemind_provider_identity.py
           test/unit_test/api/db/services/test_file_service_upload_document.py
+          test/unit_test/api/db/services/test_llm_service_gemini_content_free.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
+          test/unit_test/rag/utils/test_base64_image.py
+          test/unit_test/rag/llm/test_gemini_cv_generation_v2.py
+          test/unit_test/rag/svr/task_executor_refactor/test_embedding_service.py
+          test/unit_test/deepdoc/parser/test_mineru_parser.py
           test/unit_test/sdk/test_ragflow_request_timeout.py
           test/unit_test/sdk/test_musemind_exact_dataset_contract.py
           test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
           test/unit_test/tools/test_musemind_exact_scope_conformance.py
           test/unit_test/tools/musemind_conformance/test_jina_generation.py
+          test/unit_test/tools/musemind_conformance/test_gemini_generation.py
           tools/musemind_conformance/c05_parser_intake.py
           tools/musemind_conformance/create_adopt.py
           tools/musemind_conformance/exact_scope.py
           tools/musemind_conformance/jina_generation.py
+          tools/musemind_conformance/gemini_generation.py
 
       - name: Test remediated embedding provider contracts
         run: >-
           .venv/bin/pytest
           test/unit_test/rag/llm/test_embedding_model.py
+          test/unit_test/rag/llm/test_gemini_cv_generation_v2.py
+          test/unit_test/rag/svr/task_executor_refactor/test_embedding_service.py
+          test/unit_test/deepdoc/parser/test_mineru_parser.py
 
       - name: Test exact retrieval route
         run: >-
@@ -221,6 +253,7 @@ jobs:
           .venv/bin/pytest
           test/unit_test/api/db/test_musemind_provider_identity.py
           test/unit_test/tools/musemind_conformance/test_jina_generation.py
+          test/unit_test/tools/musemind_conformance/test_gemini_generation.py
 
       - name: Test SDK timeout and exact wire contract
         run: >-

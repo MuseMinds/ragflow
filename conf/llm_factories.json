@@ -2384,6 +2384,27 @@
             "rank": "997",
             "llm": [
                 {
+                    "llm_name": "gemini-3.1-flash-lite",
+                    "tags": "LLM,1024K",
+                    "max_tokens": 1048576,
+                    "model_type": "chat",
+                    "is_tools": false
+                },
+                {
+                    "llm_name": "gemini-3.5-flash",
+                    "tags": "LLM,1024K,IMAGE2TEXT",
+                    "max_tokens": 1048576,
+                    "model_type": "image2text",
+                    "is_tools": false
+                },
+                {
+                    "llm_name": "gemini-embedding-2",
+                    "tags": "TEXT EMBEDDING,IMAGE EMBEDDING",
+                    "max_tokens": 8192,
+                    "model_type": "embedding",
+                    "is_tools": false
+                },
+                {
                     "llm_name": "gemini-3-pro-preview",
                     "tags": "LLM,1M,IMAGE2TEXT",
                     "max_tokens": 1048576,

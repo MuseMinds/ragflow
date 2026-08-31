@@ -166,8 +166,6 @@ def vision_figure_parser_docx_wrapper_naive(chunks, idx_lst, callback=None, **kw
                     context_below=ck.get("context_below"),
                 )
                 logging.info(f"[VisionFigureParser] figure={idx} context_above_len={len(context_above)} context_below_len={len(context_below)} prompt=with_context")
-                logging.info(f"[VisionFigureParser] figure={idx} context_above_snippet={context_above[:512]}")
-                logging.info(f"[VisionFigureParser] figure={idx} context_below_snippet={context_below[:512]}")
             else:
                 prompt = vision_llm_figure_describe_prompt()
                 logging.info(f"[VisionFigureParser] figure={idx} context_len=0 prompt=default")
@@ -201,8 +199,8 @@ shared_executor = ThreadPoolExecutor(max_workers=10)
 class VisionFigureParser:
     def __init__(self, vision_model, figures_data, *args, **kwargs):
         self.vision_model = vision_model
-        self.figure_contexts = kwargs.get("figure_contexts") or []
         self.context_size = max(0, int(kwargs.get("context_size", 0) or 0))
+        self.figure_contexts = (kwargs.get("figure_contexts") or []) if self.context_size else []
         self._extract_figures_info(figures_data)
         assert len(self.figures) == len(self.descriptions)
         assert not self.positions or (len(self.figures) == len(self.positions))
@@ -265,8 +263,6 @@ class VisionFigureParser:
                 logging.info(
                     f"[VisionFigureParser] figure={figure_idx} context_size={self.context_size} context_above_len={len(context_above)} context_below_len={len(context_below)} prompt=with_context"
                 )
-                logging.info(f"[VisionFigureParser] figure={figure_idx} context_above_snippet={context_above[:512]}")
-                logging.info(f"[VisionFigureParser] figure={figure_idx} context_below_snippet={context_below[:512]}")
             else:
                 prompt = vision_llm_figure_describe_prompt()
                 logging.info(f"[VisionFigureParser] figure={figure_idx} context_size={self.context_size} context_len=0 prompt=default")

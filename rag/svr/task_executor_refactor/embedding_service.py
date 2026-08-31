@@ -27,6 +27,7 @@ from common.misc_utils import thread_pool_exec
 from common.token_utils import truncate
 from rag.svr.task_executor_refactor.embedding_utils import EmbeddingUtils
 from rag.svr.task_executor_refactor.task_context import TaskContext
+from rag.llm.musemind_gemini import GeminiPassage, PRIVATE_IMAGE_FIELD
 
 
 class EmbeddingService:
@@ -73,6 +74,26 @@ class EmbeddingService:
         """
         if parser_config is None:
             parser_config = {}
+
+        if getattr(embedding_model.mdl, "manages_embedding_inputs", False) is True:
+            titles, contents = EmbeddingUtils.prepare_texts_for_embedding(docs)
+            inputs = []
+            for doc, title, content in zip(docs, titles, contents, strict=True):
+                image = doc.pop(PRIVATE_IMAGE_FIELD, None)
+                inputs.append(image if image is not None else GeminiPassage(title=title, content=content))
+            batches = []
+            token_count = 0
+            for i in range(0, len(inputs), self._embedding_batch_size):
+                async with self._task_context.embed_limiter:
+                    vectors, used = await thread_pool_exec(embedding_model.encode, inputs[i : i + self._embedding_batch_size])
+                batches.append(vectors)
+                token_count += used
+                if self._task_context.progress_cb:
+                    self._task_context.progress_cb(prog=0.7 + 0.2 * (i + 1) / len(inputs), msg="")
+            vectors = EmbeddingUtils.stack_vectors(batches)
+            if len(vectors) != len(docs):
+                raise ValueError("Gemini embedding vector cardinality mismatch")
+            return token_count, EmbeddingUtils.attach_vectors(docs, vectors)
 
         # Prepare text for embedding using EmbeddingUtils
         titles, contents = EmbeddingUtils.prepare_texts_for_embedding(docs)

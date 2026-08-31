@@ -45,6 +45,7 @@ from api.db.joint_services.memory_message_service import handle_save_to_memory_t
 from common.connection_utils import timeout
 from common.metadata_utils import turn2jsonschema, update_metadata_to
 from rag.utils.base64_image import image2id
+from rag.llm.musemind_gemini import GeminiPassage, MUSEMIND_GEMINI_EMBEDDING_ID, PRIVATE_IMAGE_FIELD
 from rag.utils.raptor_utils import (
     collect_raptor_chunk_ids,
     collect_raptor_methods,
@@ -395,7 +396,13 @@ async def build_chunks(task, progress_callback):
                 d["img_id"] = ""
                 docs.append(d)
                 return
-            await image2id(d, partial(settings.STORAGE_IMPL.put, tenant_id=task["tenant_id"]), d["id"], task["kb_id"])
+            await image2id(
+                d,
+                partial(settings.STORAGE_IMPL.put, tenant_id=task["tenant_id"]),
+                d["id"],
+                task["kb_id"],
+                retain_for_embedding=task.get("embd_id") == MUSEMIND_GEMINI_EMBEDDING_ID,
+            )
             docs.append(d)
         except Exception:
             logging.exception("Saving image of chunk {}/{}/{} got exception".format(task["location"], task["name"], d["id"]))
@@ -542,8 +549,9 @@ async def build_chunks(task, progress_callback):
             raise
         metadata = {}
         for doc in docs:
-            metadata = update_metadata_to(metadata, doc["metadata_obj"])
-            del doc["metadata_obj"]
+            generated_metadata = doc.pop("metadata_obj", None)
+            if generated_metadata:
+                metadata = update_metadata_to(metadata, generated_metadata)
         if metadata:
             existing_meta = DocMetadataService.get_document_metadata(task["doc_id"])
             existing_meta = existing_meta if isinstance(existing_meta, dict) else {}
@@ -691,6 +699,36 @@ def init_kb(row, vector_size: int):
 async def embedding(docs, mdl, parser_config=None, callback=None):
     if parser_config is None:
         parser_config = {}
+    if getattr(mdl.mdl, "manages_embedding_inputs", False) is True:
+        inputs = []
+        for d in docs:
+            image = d.pop(PRIVATE_IMAGE_FIELD, None)
+            if image is not None:
+                inputs.append(image)
+                continue
+            title = d.get("docnm_kwd", "Title")
+            content = "\n".join(d.get("question_kwd", [])) or d["content_with_weight"]
+            content = re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", content)
+            inputs.append(GeminiPassage(title=title, content=content if content.strip() else "None"))
+
+        vectors = []
+        token_count = 0
+        for i in range(0, len(inputs), settings.EMBEDDING_BATCH_SIZE):
+            async with embed_limiter:
+                batch_vectors, used = await thread_pool_exec(mdl.encode, inputs[i : i + settings.EMBEDDING_BATCH_SIZE])
+            vectors.append(batch_vectors)
+            token_count += used
+            if callback:
+                callback(prog=0.7 + 0.2 * (i + 1) / len(inputs), msg="")
+        vects = np.vstack(vectors) if vectors else np.array([])
+        assert len(vects) == len(docs)
+        vector_size = 0
+        for index, doc in enumerate(docs):
+            vector = vects[index].tolist()
+            vector_size = len(vector)
+            doc[f"q_{vector_size}_vec"] = vector
+        return token_count, vector_size
+
     tts, cnts = [], []
     for d in docs:
         tts.append(d.get("docnm_kwd", "Title"))

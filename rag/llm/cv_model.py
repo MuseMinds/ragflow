@@ -15,6 +15,7 @@
 #
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -33,7 +34,14 @@ from openai.lib.azure import AzureOpenAI, AsyncAzureOpenAI
 
 from common.token_utils import num_tokens_from_string, total_token_count_from_response
 from rag.nlp import is_english
-from rag.prompts.generator import vision_llm_describe_prompt
+from rag.prompts.generator import vision_llm_describe_prompt, vision_llm_figure_describe_prompt
+from rag.llm.musemind_gemini import (
+    FIGURE_PROMPT_SHA256,
+    MUSEMIND_GEMINI_IMAGE_MODEL,
+    PAGE_PROMPT_SHA256,
+    image_mime_type,
+    provider_http_options,
+)
 
 
 from common.misc_utils import thread_pool_exec
@@ -827,13 +835,45 @@ class GeminiCV(Base):
 
     def __init__(self, key, model_name="gemini-1.0-pro-vision-latest", lang="Chinese", **kwargs):
         from google import genai
+        from google.genai import types
 
         self.api_key = key
         self.model_name = model_name
-        self.client = genai.Client(api_key=key)
+        self._musemind_generation_v2 = self.model_name == MUSEMIND_GEMINI_IMAGE_MODEL
+        self.content_free_observability = self._musemind_generation_v2
+        client_options = {"http_options": provider_http_options(types)} if self._musemind_generation_v2 else {}
+        self.client = genai.Client(api_key=key, **client_options)
         self.lang = lang
         Base.__init__(self, **kwargs)
+        if self._musemind_generation_v2:
+            self._verify_generation_v2_prompts()
         logging.info(f"[GeminiCV] Initialized with model={self.model_name} lang={self.lang}")
+
+    @staticmethod
+    def _verify_generation_v2_prompts():
+        prompt_dir = Path(__file__).resolve().parents[1] / "prompts"
+        expected = {
+            "vision_llm_figure_describe_prompt.md": FIGURE_PROMPT_SHA256,
+            "vision_llm_describe_prompt.md": PAGE_PROMPT_SHA256,
+        }
+        for filename, digest in expected.items():
+            actual = hashlib.sha256((prompt_dir / filename).read_bytes()).hexdigest()
+            if actual != digest:
+                raise RuntimeError("Gemini image-description prompt identity mismatch")
+
+    def _generation_v2_config(self):
+        from google.genai import types
+
+        return types.GenerateContentConfig(
+            candidate_count=1,
+            max_output_tokens=2048,
+            response_mime_type="text/plain",
+            seed=0,
+            temperature=0.0,
+            top_p=1.0,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            tools=None,
+        )
 
     def _image_to_part(self, image):
         from google.genai import types
@@ -847,6 +887,9 @@ class GeminiCV(Base):
             header, b64data = data_url.split(",", 1)
             mime = header.split(":", 1)[1].split(";", 1)[0]
             data = base64.b64decode(b64data)
+
+        if self._musemind_generation_v2:
+            mime = image_mime_type(data)
 
         return types.Part(
             inline_data=types.Blob(
@@ -901,7 +944,7 @@ class GeminiCV(Base):
     def describe(self, image):
         from google.genai import types
 
-        prompt = (
+        prompt = vision_llm_describe_prompt() if self._musemind_generation_v2 else (
             "请用中文详细描述一下图中的内容，比如时间，地点，人物，事情，人物心情等，如果有数据请提取出数据。"
             if self.lang.lower() == "chinese"
             else "Please describe the content of this picture, like where, when, who, what happen. If it has number data, please extract them out."
@@ -917,16 +960,26 @@ class GeminiCV(Base):
             )
         ]
 
-        res = self.client.models.generate_content(
-            model=self.model_name,
-            contents=contents,
-        )
-        return res.text, total_token_count_from_response(res)
+        try:
+            res = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                **({"config": self._generation_v2_config()} if self._musemind_generation_v2 else {}),
+            )
+        except Exception:
+            if self._musemind_generation_v2:
+                logging.error("GeminiCV generation-v2 request failed")
+                raise RuntimeError("Gemini image-description request failed") from None
+            raise
+        tokens = getattr(getattr(res, "usage_metadata", None), "total_token_count", None)
+        return res.text, tokens if tokens is not None else total_token_count_from_response(res)
 
     def describe_with_prompt(self, image, prompt=None):
         from google.genai import types
 
         vision_prompt = prompt if prompt else vision_llm_describe_prompt()
+        if self._musemind_generation_v2 and vision_prompt not in {vision_llm_describe_prompt(), vision_llm_figure_describe_prompt()}:
+            raise ValueError("Gemini image-description prompt is not pinned")
 
         contents = [
             types.Content(
@@ -938,11 +991,19 @@ class GeminiCV(Base):
             )
         ]
 
-        res = self.client.models.generate_content(
-            model=self.model_name,
-            contents=contents,
-        )
-        return res.text, total_token_count_from_response(res)
+        try:
+            res = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                **({"config": self._generation_v2_config()} if self._musemind_generation_v2 else {}),
+            )
+        except Exception:
+            if self._musemind_generation_v2:
+                logging.error("GeminiCV generation-v2 request failed")
+                raise RuntimeError("Gemini image-description request failed") from None
+            raise
+        tokens = getattr(getattr(res, "usage_metadata", None), "total_token_count", None)
+        return res.text, tokens if tokens is not None else total_token_count_from_response(res)
 
     async def async_chat(self, system, history, gen_conf, images=None, video_bytes=None, filename="", **kwargs):
         if video_bytes:

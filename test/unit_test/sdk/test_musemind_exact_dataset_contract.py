@@ -49,6 +49,23 @@ def test_sdk_sends_dedicated_exact_dataset_contract(monkeypatch):
     ]
 
 
+def test_sdk_sends_generation_v2_exact_dataset_contract(monkeypatch):
+    client = object.__new__(RAGFlow)
+    calls = []
+    response = SimpleNamespace(json=lambda: {"code": 0, "data": {"outcome": "ADOPTED", "dataset_id": DATASET_ID}})
+    monkeypatch.setattr(client, "post", lambda path, payload: calls.append((path, payload)) or response)
+    projection = {
+        **_projection(),
+        "embd_id": "gemini-embedding-2@musemind@Gemini",
+        "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+        "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+    }
+
+    client.create_or_adopt_dataset_exact(DATASET_ID, projection)
+
+    assert calls[0][1]["schema"] == "musemind.ragflow-dataset-create-or-adopt/v2"
+
+
 @pytest.mark.parametrize(
     ("dataset_id", "projection"),
     [

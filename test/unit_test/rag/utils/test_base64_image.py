@@ -17,11 +17,41 @@
 """Unit tests for composite storage image ID parsing."""
 
 from functools import partial
+from types import ModuleType
+import sys
 
 import pytest
 from PIL import Image
 
 from rag.utils import base64_image
+from rag.llm.musemind_gemini import PRIVATE_IMAGE_FIELD
+
+
+class _Limiter:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_image2id_retains_transient_embedding_bytes_only_when_requested(monkeypatch):
+    limiter_module = ModuleType("rag.svr.task_executor_limiter")
+    limiter_module.minio_limiter = _Limiter()
+    monkeypatch.setitem(sys.modules, "rag.svr.task_executor_limiter", limiter_module)
+    stored = []
+
+    def put(*, bucket, fnm, binary):
+        stored.append((bucket, fnm, binary))
+
+    document = {"image": base64_image.test_image}
+    await base64_image.image2id(document, partial(put), "chunk", "dataset", retain_for_embedding=True)
+
+    assert document["img_id"] == "dataset-chunk"
+    assert document[PRIVATE_IMAGE_FIELD] == stored[0][2]
+    assert document[PRIVATE_IMAGE_FIELD].startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n"))
+    assert "image" not in document
 
 
 @pytest.mark.p2

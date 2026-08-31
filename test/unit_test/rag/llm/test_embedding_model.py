@@ -28,6 +28,7 @@
 """
 
 import json
+import base64
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -38,6 +39,7 @@ from rag.llm.embedding_model import (
     DEFAULT_MAX_TOKENS,
     BedrockEmbed,
     EmbeddingError,
+    GeminiEmbed,
     JinaMultiVecEmbed,
     LocalAIEmbed,
     MistralEmbed,
@@ -46,6 +48,7 @@ from rag.llm.embedding_model import (
     OpenAIEmbed,
     ZhipuEmbed,
 )
+from rag.llm.musemind_gemini import GeminiPassage, RETRYABLE_HTTP_STATUSES
 from common.exceptions import ModelException
 from common.token_utils import num_tokens_from_string
 
@@ -65,6 +68,67 @@ class _OpenAIResp:
         self.data = [SimpleNamespace(embedding=list(v)) for v in vectors]
         if total_tokens is not None:
             self.usage = SimpleNamespace(total_tokens=total_tokens)
+
+
+class _GeminiModels:
+    def __init__(self, dimension=3072):
+        self.calls = []
+        self.dimension = dimension
+
+    def embed_content(self, **kwargs):
+        self.calls.append(kwargs)
+        vector = [0.0] * self.dimension
+        vector[0] = 2.0
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=vector) for _ in kwargs["contents"]])
+
+
+def _make_gemini(dimension=3072):
+    models = _GeminiModels(dimension)
+    with patch("google.genai.Client") as client:
+        client.return_value = SimpleNamespace(models=models)
+        embed = GeminiEmbed("g" * 40, "gemini-embedding-2")
+    return embed, models, client.call_args.kwargs
+
+
+def test_gemini_generation_v2_uses_typed_exact_text_and_image_contents():
+    embed, models, client_kwargs = _make_gemini()
+    png = b"\x89PNG\r\n\x1a\n" + b"synthetic"
+
+    vectors, _ = embed.encode([GeminiPassage("Titolo", "Corpo"), png])
+    query, _ = embed.encode_queries("cerca")
+
+    assert vectors.shape == (2, 3072)
+    assert query.shape == (3072,)
+    assert vectors.dtype == np.float32
+    assert np.allclose(np.linalg.norm(vectors, axis=1), 1.0)
+    document_parts = models.calls[0]["contents"]
+    assert len(document_parts) == 2
+    assert document_parts[0].parts[0].text == "title: Titolo | text: Corpo"
+    assert document_parts[1].parts[0].inline_data.mime_type == "image/png"
+    assert models.calls[1]["contents"][0].parts[0].text == "task: search result | query: cerca"
+    for call in models.calls:
+        assert call["config"].task_type is None
+        assert call["config"].auto_truncate is False
+        assert call["config"].output_dimensionality == 3072
+    retry = client_kwargs["http_options"].retry_options
+    assert client_kwargs["http_options"].timeout == 10_000
+    assert retry.attempts == 3
+    assert tuple(retry.http_status_codes) == RETRYABLE_HTTP_STATUSES
+
+
+def test_gemini_generation_v2_rejects_invalid_image_and_dimension():
+    embed, _, _ = _make_gemini()
+    with pytest.raises(ValueError, match="JPEG or PNG"):
+        embed.encode([b"not-an-image"])
+    encoded = base64.b64encode(b"\x89PNG\r\n\x1a\nsynthetic").decode("ascii")
+    vectors, _ = embed.encode([f"data:image/png;base64,{encoded}"])
+    assert vectors.shape == (1, 3072)
+    with pytest.raises(ValueError, match="data URL is invalid"):
+        embed.encode(["data:image/png;base64,not-base64!"])
+
+    wrong, _, _ = _make_gemini(dimension=3)
+    with pytest.raises(EmbeddingError, match="dimension"):
+        wrong.encode([GeminiPassage("title", "content")])
 
 
 def _openai_create(total_tokens=None, dim=3):

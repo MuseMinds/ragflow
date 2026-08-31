@@ -203,7 +203,15 @@ class ChunkService:
                     docs.append(d)
                     return
 
-                await image2id(d, partial(settings.STORAGE_IMPL.put, tenant_id=ctx.tenant_id), d["id"], ctx.kb_id)
+                from rag.llm.musemind_gemini import MUSEMIND_GEMINI_EMBEDDING_ID
+
+                await image2id(
+                    d,
+                    partial(settings.STORAGE_IMPL.put, tenant_id=ctx.tenant_id),
+                    d["id"],
+                    ctx.kb_id,
+                    retain_for_embedding=ctx.embd_id == MUSEMIND_GEMINI_EMBEDDING_ID,
+                )
                 docs.append(d)
             except Exception:
                 logging.exception("Saving image of chunk {}/{}/{} got exception".format(ctx.location, ctx.name, d["id"]))

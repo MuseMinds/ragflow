@@ -29,7 +29,7 @@ test_image_base64 = "iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAA6ElEQVR4nO3
 test_image = base64.b64decode(test_image_base64)
 
 
-async def image2id(d: dict, storage_put_func: partial, objname: str, bucket: str = "imagetemps"):
+async def image2id(d: dict, storage_put_func: partial, objname: str, bucket: str = "imagetemps", *, retain_for_embedding: bool = False):
     import logging
     from io import BytesIO
     from rag.svr.task_executor_limiter import minio_limiter
@@ -80,6 +80,12 @@ async def image2id(d: dict, storage_put_func: partial, objname: str, bucket: str
         await thread_pool_exec(lambda: storage_put_func(bucket=bucket, fnm=objname, binary=jpeg_binary))
 
     d["img_id"] = f"{bucket}-{objname}"
+    if retain_for_embedding:
+        # Private transient field: consumed and removed by the embedding stage.
+        # It must never reach the document store, logs, traces, or callbacks.
+        from rag.llm.musemind_gemini import PRIVATE_IMAGE_FIELD
+
+        d[PRIVATE_IMAGE_FIELD] = jpeg_binary
 
 
 def parse_storage_composite_id(composite_id: str) -> tuple[str, str] | None:

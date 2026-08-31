@@ -59,12 +59,12 @@ def chunk(filename, binary, tenant_id, lang, callback=None, **kwargs):
             cv_mdl = LLMBundle(tenant_id, model_config=cv_model_config, lang=lang)
             video_prompt = str(parser_config.get("video_prompt", "") or "")
             ans = asyncio.run(cv_mdl.async_chat(system="", history=[], gen_conf={}, video_bytes=binary, filename=filename, video_prompt=video_prompt))
-            callback(0.8, "CV LLM respond: %s ..." % ans[:32])
+            callback(0.8, "CV LLM response received.")
             ans += "\n" + ans
             tokenize(doc, ans, eng, language=lang)
             return [doc]
-        except Exception as e:
-            callback(prog=-1, msg=str(e))
+        except Exception:
+            callback(prog=-1, msg="CV LLM request failed.")
     else:
         img = Image.open(io.BytesIO(binary)).convert("RGB")
         doc.update(
@@ -82,7 +82,7 @@ def chunk(filename, binary, tenant_id, lang, callback=None, **kwargs):
             bxs = ocr(np.array(img))
             txt = "\n".join([t[0] for _, t in bxs if t[0]])
 
-        callback(0.4, "Finish OCR: (%s ...)" % txt[:12])
+        callback(0.4, "OCR completed.")
         if (eng and len(txt.split()) > 32) or len(txt) > 32:
             tokenize(doc, txt, eng, language=lang)
             callback(0.8, "OCR results is too long to use CV LLM.")
@@ -96,12 +96,12 @@ def chunk(filename, binary, tenant_id, lang, callback=None, **kwargs):
                 img.save(img_binary, format="JPEG")
                 img_binary.seek(0)
                 ans = cv_mdl.describe(img_binary.read())
-            callback(0.8, "CV LLM respond: %s ..." % ans[:32])
+            callback(0.8, "CV LLM response received.")
             txt += "\n" + ans
             tokenize(doc, txt, eng, language=lang)
             return attach_media_context([doc], 0, image_ctx)
-        except Exception as e:
-            callback(prog=-1, msg=str(e))
+        except Exception:
+            callback(prog=-1, msg="CV LLM request failed.")
 
     return []
 
@@ -179,7 +179,7 @@ def vision_llm_chunk(binary, vision_model, prompt=None, callback=None):
             txt += "\n" + ans
             return txt
 
-    except Exception as e:
-        callback(-1, str(e))
+    except Exception:
+        callback(-1, "CV LLM request failed.")
 
     return ""

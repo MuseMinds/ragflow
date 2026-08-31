@@ -70,6 +70,11 @@ Use this file as the local operating guide for the current codebase. Prefer the 
   `MUSEMIND_PATCHES.md`. Reconcile its service-tenant key only through the schema-aware one-shot;
   provider/model/request changes require a new immutable generation, key rotation does not, and no
   failure may fall back to TEI/Builtin/another embedder.
+- ADR-0078's generation v2 adds one `musemind` Gemini instance with pinned chat, multimodal
+  embedding and image-to-text rows. Dataset creation must use the strict v2 projection and its
+  three pinned composite IDs; retain the qualified Jina generation and registry rows as an intact
+  rollback, never mix its vectors into Gemini datasets, and never emit provider content or image
+  bytes in logs, traces, errors, callbacks or evidence.
 
 ## Commands
 ### Backend
