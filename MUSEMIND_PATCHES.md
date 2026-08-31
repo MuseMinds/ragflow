@@ -472,6 +472,22 @@ test does not by itself qualify a runtime bundle.
   No unit test calls Google, Jina or MinerU. A clean OCI build, SBOM/vulnerability review and the
   dependency-scoped live qualification remain required before this commit can replace the frozen
   pilot digest.
+- Official-upstream reproduction and patch necessity: the compatible official image
+  `docker.io/infiniflow/ragflow:v0.26.4@sha256:16d24d1968ab59e2715a85d2590f1569c9539e0362344a42f3a23e8be06a655b`
+  (`linux/amd64`, source tag commit `cb93883f3f8c975eecb2fed81210effeb3bdb06f`) was pulled by
+  digest and exercised without a provider call. Its embedding source SHA-256 was
+  `b844aec1bd2bc49bb54e55beb7d6273a7da6cbd5cfe15b3e96fd7882e0b3e4eb`. The synthetic probe
+  proved both passage and query payloads were plain strings with `RETRIEVAL_DOCUMENT`, while a
+  typed PNG `Content` failed with `TypeError` before the provider call; the canonical content-free
+  result SHA-256 was `c696c58072ee825d5e91af3bfde8df330045dc84594460d2efe19ab637b366b7`.
+  The image also lacked the MuseMind provider-registry/bootstrap and fail-closed vision modules.
+- Proxy containment proof: the strict proxy can validate the external dataset projection and
+  sanitize upload/parse status, but RAGFlow performs provider-model reconciliation and the
+  asynchronous parser/task-executor embedding after the proxy transaction. The proxy has no
+  post-response access to the internal typed provider payload, returned vectors or transient
+  parsed-image fields, so post-validation cannot make the upstream binary embed image chunks in
+  the shared space or remove those fields before indexing. MM-RF-0018 is therefore contained in
+  the governed fork without widening raw RAGFlow, provider-secret or PostgreSQL authority.
 - Rollback: fence the Gemini candidate and restore the complete qualified Jina generation,
   dataset/index set and binding. Never switch only a model over an index built in the other
   embedding space, reuse vectors across generations or fall back automatically.
