@@ -488,6 +488,13 @@ test does not by itself qualify a runtime bundle.
   parsed-image fields, so post-validation cannot make the upstream binary embed image chunks in
   the shared space or remove those fields before indexing. MM-RF-0018 is therefore contained in
   the governed fork without widening raw RAGFlow, provider-secret or PostgreSQL authority.
+- Develop bootstrap finding (2026-09-01): the first exact candidate reached provider identity
+  `UNCHANGED`, then the content-free Gemini probe failed every embedding call while the pinned chat
+  and image-to-text calls passed. A local stage probe against the same `AWSCURRENT` credential
+  reproduced `ValueError` for document, image and query embedding, while the otherwise identical
+  typed request passed after omitting `EmbedContentConfig.auto_truncate`. The Google Gen AI SDK
+  documents `autoTruncate` as Gemini Enterprise Agent Platform only; the Gemini Developer API
+  example sends only `output_dimensionality` ([SDK reference](https://googleapis.github.io/js-genai/release_docs/interfaces/types.EmbedContentConfig.html), [Gemini API example](https://ai.google.dev/api/embeddings), accessed 2026-09-01). The fix omits that unsupported wire field but preserves `truncate=false` semantically by rejecting text above the exact 8192-token limit before any provider call; focused tests assert both omission and zero-call oversize denial. A rebuilt exact digest and live probe remain required.
 - Rollback: fence the Gemini candidate and restore the complete qualified Jina generation,
   dataset/index set and binding. Never switch only a model over an index built in the other
   embedding space, reuse vectors across generations or fall back automatically.

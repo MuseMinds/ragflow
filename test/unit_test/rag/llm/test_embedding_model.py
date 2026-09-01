@@ -116,7 +116,7 @@ def test_gemini_generation_v2_uses_typed_exact_text_and_image_contents():
     assert models.calls[1]["contents"][0].parts[0].text == "task: search result | query: cerca"
     for call in models.calls:
         assert call["config"].task_type is None
-        assert call["config"].auto_truncate is False
+        assert call["config"].auto_truncate is None
         assert call["config"].output_dimensionality == 3072
     retry = client_kwargs["http_options"].retry_options
     assert client_kwargs["http_options"].timeout == REQUEST_TIMEOUT_MS
@@ -155,6 +155,18 @@ def test_gemini_generation_v2_rejects_empty_batch_and_query_before_provider():
         embed.encode([])
     with pytest.raises(ValueError, match="empty"):
         embed.encode_queries("   ")
+
+    assert models.calls == []
+
+
+def test_gemini_generation_v2_rejects_oversized_text_without_enterprise_auto_truncate():
+    embed, models, _ = _make_gemini()
+
+    with patch(
+        "rag.llm.embedding_model.num_tokens_from_string",
+        return_value=8193,
+    ), pytest.raises(ValueError, match="8192-token limit"):
+        embed.encode([GeminiPassage("title", "content")])
 
     assert models.calls == []
 
