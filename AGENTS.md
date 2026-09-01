@@ -1,6 +1,8 @@
 # RAGFlow Instructions
 
-Use this file as the local operating guide for the current codebase. Prefer the code and the current CLAUDE.md over any older convention or remembered project shape.
+Use this file as the root operating guide for the current codebase. The root `CLAUDE.md` delegates
+to this file; `web/CLAUDE.md` adds frontend-only rules below `web/`. Prefer current code and the
+nearest applicable instructions over remembered project shape.
 
 ## Core stance
 - The MuseMind pilot runs the currently qualified `musemind` commit/digest as a frozen dependency.
