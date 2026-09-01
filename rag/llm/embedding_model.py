@@ -908,7 +908,11 @@ class GeminiEmbed(Base):
         used_tokens = sum(item[1] for item in prepared)
         batch_size = EMBEDDING_IMAGE_BATCH_SIZE if any(item[2] for item in prepared) else EMBEDDING_TEXT_BATCH_SIZE
         vectors = []
-        config = self.types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSION, auto_truncate=False)
+        # Gemini Developer API rejects the Enterprise-only ``auto_truncate``
+        # field even when it is explicitly false. The generation contract still
+        # fails closed because _generation_v2_content rejects oversized text
+        # locally before this request is built.
+        config = self.types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIMENSION)
         try:
             for start in range(0, len(prepared), batch_size):
                 contents = [item[0] for item in prepared[start : start + batch_size]]
