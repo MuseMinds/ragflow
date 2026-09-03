@@ -53,10 +53,11 @@ from rag.llm.embedding_model import (
 from rag.llm.musemind_gemini import (
     REQUEST_ATTEMPTS,
     REQUEST_TIMEOUT_MS,
-    RETRYABLE_HTTP_STATUSES,
+    RETRY_EXP_BASE,
     RETRY_INITIAL_DELAY_SECONDS,
     RETRY_JITTER_SECONDS,
     RETRY_MAX_DELAY_SECONDS,
+    RETRYABLE_HTTP_STATUSES,
     TOTAL_DEADLINE_MS,
     GeminiPassage,
     gemini_failure_class,
@@ -125,7 +126,7 @@ def test_gemini_generation_v2_uses_typed_exact_text_and_image_contents():
         assert call["config"].output_dimensionality == 3072
     retry = client_kwargs["http_options"].retry_options
     assert client_kwargs["http_options"].timeout == REQUEST_TIMEOUT_MS
-    assert retry.attempts == 3
+    assert retry.attempts == 5
     assert tuple(retry.http_status_codes) == RETRYABLE_HTTP_STATUSES
 
 
@@ -138,15 +139,20 @@ def test_gemini_generation_v2_google_sdk_retry_budget_matches_total_deadline():
     states = [SimpleNamespace(attempt_number=attempt) for attempt in range(1, REQUEST_ATTEMPTS + 1)]
     waits = [actual["wait"](state) for state in states[:-1]]
 
-    assert [actual["stop"](state) for state in states] == [False, False, True]
-    assert 1.0 <= waits[0] <= 1.5
-    assert 2.0 <= waits[1] <= 2.5
+    assert [actual["stop"](state) for state in states] == [False, False, False, False, True]
+    for wait, lower, upper in zip(waits, (1.0, 2.0, 4.0, 8.0), (2.0, 3.0, 5.0, 9.0), strict=True):
+        assert lower <= wait <= upper
     assert REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS + sum(waits) * 1000 <= TOTAL_DEADLINE_MS
     assert REQUEST_TIMEOUT_MS == 10_000
-    assert TOTAL_DEADLINE_MS == 34_000
+    assert RETRY_MAX_DELAY_SECONDS == 60.0
+    assert TOTAL_DEADLINE_MS == 69_000
     assert (
         REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS
-        + (RETRY_INITIAL_DELAY_SECONDS + RETRY_JITTER_SECONDS + RETRY_MAX_DELAY_SECONDS) * 1000
+        + sum(
+            RETRY_INITIAL_DELAY_SECONDS * RETRY_EXP_BASE**exponent + RETRY_JITTER_SECONDS
+            for exponent in range(REQUEST_ATTEMPTS - 1)
+        )
+        * 1000
         == TOTAL_DEADLINE_MS
     )
 
@@ -169,7 +175,7 @@ def test_gemini_failure_log_omits_exception_text(caplog):
     with caplog.at_level("ERROR"):
         log_gemini_failure("EMBEDDING", error)
 
-    assert "operation=EMBEDDING failure_class=HTTP_429 attempts=3" in caplog.text
+    assert "operation=EMBEDDING failure_class=HTTP_429 attempts=5" in caplog.text
     assert "secret provider payload" not in caplog.text
 
 
