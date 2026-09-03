@@ -54,6 +54,9 @@ from rag.llm.musemind_gemini import (
     REQUEST_ATTEMPTS,
     REQUEST_TIMEOUT_MS,
     RETRYABLE_HTTP_STATUSES,
+    RETRY_INITIAL_DELAY_SECONDS,
+    RETRY_JITTER_SECONDS,
+    RETRY_MAX_DELAY_SECONDS,
     TOTAL_DEADLINE_MS,
     GeminiPassage,
     gemini_failure_class,
@@ -139,6 +142,13 @@ def test_gemini_generation_v2_google_sdk_retry_budget_matches_total_deadline():
     assert 1.0 <= waits[0] <= 1.5
     assert 2.0 <= waits[1] <= 2.5
     assert REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS + sum(waits) * 1000 <= TOTAL_DEADLINE_MS
+    assert REQUEST_TIMEOUT_MS == 10_000
+    assert TOTAL_DEADLINE_MS == 34_000
+    assert (
+        REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS
+        + (RETRY_INITIAL_DELAY_SECONDS + RETRY_JITTER_SECONDS + RETRY_MAX_DELAY_SECONDS) * 1000
+        == TOTAL_DEADLINE_MS
+    )
 
 
 @pytest.mark.parametrize(

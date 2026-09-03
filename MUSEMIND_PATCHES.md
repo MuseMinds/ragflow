@@ -450,8 +450,8 @@ test does not by itself qualify a runtime bundle.
   `gemini-3.5-flash` image-to-text. The Gemini embedding adapter emits one typed `Content` per
   passage, query or image, applies the exact passage/query prefixes without `task_type`, rejects
   rather than truncates over-limit inputs, verifies cardinality/dimension/finiteness and returns
-  normalized float32 vectors under the ADR-0086 three-attempt, eight-second-per-attempt policy
-  with bounded exponential jitter and a sub-30-second total budget.
+  normalized float32 vectors under the ADR-0086/0087 three-attempt, ten-second-per-attempt policy
+  with bounded exponential jitter and a 34-second request-plus-wait upper bound.
 - Multimodal ingestion: both the legacy and `TE_RUN_MODE=0` executors retain image bytes only in a
   transient private field, embed image chunks without filename mixing, and remove the field before
   indexing. Gemini image description verifies the pinned page/figure prompt file hashes and uses
@@ -497,12 +497,16 @@ test does not by itself qualify a runtime bundle.
   documents `autoTruncate` as Gemini Enterprise Agent Platform only; the Gemini Developer API
   example sends only `output_dimensionality` ([SDK reference](https://googleapis.github.io/js-genai/release_docs/interfaces/types.EmbedContentConfig.html), [Gemini API example](https://ai.google.dev/api/embeddings), accessed 2026-09-01). The fix omits that unsupported wire field but preserves `truncate=false` semantically by rejecting text above the exact 8192-token limit before any provider call; focused tests assert both omission and zero-call oversize denial. A rebuilt exact digest and live probe remain required.
 - Retry/observability amendment (ADR-0086, 2026-09-03): the three-attempt retry remains inside the
-  pinned Gemini adapters, but eight-second request timeouts plus bounded 1–2.5 second exponential
-  jitter replace synchronized zero-wait retries while retaining a sub-30-second total bound. A
+  pinned Gemini adapters, and bounded 1–2.5 second exponential jitter replaces synchronized
+  zero-wait retries. ADR-0087 (2026-09-03) supersedes only the eight-second timeout and sub-30-second
+  budget after the exact candidate failed twice at eight seconds and passed with the same jitter at
+  ten seconds: the effective request-plus-wait upper bound is 34 seconds. A
   terminal adapter failure logs only `operation`, a bounded HTTP/timeout/transport class and the
   configured attempt count; exception text, source/prompt bytes and provider response bodies are
-  never logged. This patch is required in the governed fork because the async task executor calls
-  the model SDK after the proxy transaction and the proxy cannot observe or pace those retries.
+  never logged. The strict bootstrap additionally distinguishes `EMBEDDING`, `CHAT` and
+  `IMAGE_TO_TEXT`. This patch is required in the governed fork because the async task executor
+  calls the model SDK after the proxy transaction and the proxy cannot observe or pace those
+  retries.
 - Rollback: fence the Gemini candidate and restore the complete qualified Jina generation,
   dataset/index set and binding. Never switch only a model over an index built in the other
   embedding space, reuse vectors across generations or fall back automatically.
