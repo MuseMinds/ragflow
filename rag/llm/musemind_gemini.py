@@ -4,7 +4,10 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+
+LOGGER = logging.getLogger("musemind.ragflow.gemini")
 
 MUSEMIND_GEMINI_EMBEDDING_MODEL = "gemini-embedding-2"
 MUSEMIND_GEMINI_EMBEDDING_ID = "gemini-embedding-2@musemind@Gemini"
@@ -19,11 +22,14 @@ EMBEDDING_IMAGE_BATCH_SIZE = 6
 MAX_TEXT_TOKENS = 8192
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 RETRYABLE_HTTP_STATUSES = (408, 429, 500, 502, 503, 504)
-# ADR-0078 pins three exact 10-second attempts and a 30-second total deadline.
-# google-genai 1.55.0 applies Tenacity waits outside each HTTP timeout.
-REQUEST_TIMEOUT_MS = 10_000
+# ADR-0086 retains three bounded attempts but adds exponential jitter so
+# concurrent ingestion tasks do not synchronize an immediate retry wave.
+REQUEST_TIMEOUT_MS = 8_000
 REQUEST_ATTEMPTS = 3
-SDK_ZERO_WAIT_SENTINEL = -1.0
+RETRY_INITIAL_DELAY_SECONDS = 1.0
+RETRY_MAX_DELAY_SECONDS = 2.5
+RETRY_EXP_BASE = 2.0
+RETRY_JITTER_SECONDS = 0.5
 TOTAL_DEADLINE_MS = 30_000
 PRIVATE_IMAGE_FIELD = "_musemind_embedding_image"
 
@@ -69,14 +75,55 @@ def provider_http_options(types):
         timeout=REQUEST_TIMEOUT_MS,
         retry_options=types.HttpRetryOptions(
             attempts=REQUEST_ATTEMPTS,
-            # google-genai 1.55.0 uses ``value or default`` and would replace
-            # literal zero with SDK defaults. Truthy negative sentinels reach
-            # Tenacity unchanged; wait_exponential_jitter clamps them to exact
-            # zero, so the three 10-second attempts remain the full deadline.
-            initial_delay=SDK_ZERO_WAIT_SENTINEL,
-            max_delay=SDK_ZERO_WAIT_SENTINEL,
-            exp_base=1.0,
-            jitter=SDK_ZERO_WAIT_SENTINEL,
+            initial_delay=RETRY_INITIAL_DELAY_SECONDS,
+            max_delay=RETRY_MAX_DELAY_SECONDS,
+            exp_base=RETRY_EXP_BASE,
+            jitter=RETRY_JITTER_SECONDS,
             http_status_codes=list(RETRYABLE_HTTP_STATUSES),
         ),
+    )
+
+
+def gemini_failure_class(error: BaseException) -> str:
+    """Classify a Gemini failure without serializing its message or payload."""
+    raw_status = getattr(error, "status_code", None)
+    if raw_status is None:
+        raw_status = getattr(error, "code", None)
+    try:
+        status = int(raw_status)
+    except (TypeError, ValueError):
+        status = None
+    if status is not None:
+        if status == 429:
+            return "HTTP_429"
+        if 500 <= status < 600:
+            return "HTTP_5XX"
+        if status == 408:
+            return "HTTP_408"
+        if 400 <= status < 500:
+            return "HTTP_4XX"
+        return "HTTP_OTHER"
+    class_name = type(error).__name__.lower()
+    if "timeout" in class_name:
+        return "TIMEOUT"
+    if "connection" in class_name or "transport" in class_name:
+        return "TRANSPORT"
+    return "OTHER"
+
+
+def log_gemini_failure(operation: str, error: BaseException) -> None:
+    """Emit only bounded operational fields; never provider/source content."""
+    failure_class = gemini_failure_class(error)
+    attempts = REQUEST_ATTEMPTS if failure_class in {
+        "HTTP_408",
+        "HTTP_429",
+        "HTTP_5XX",
+        "TIMEOUT",
+        "TRANSPORT",
+    } else 1
+    LOGGER.error(
+        "musemind_gemini_request_failed operation=%s failure_class=%s attempts=%d",
+        operation,
+        failure_class,
+        attempts,
     )

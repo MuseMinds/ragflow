@@ -56,6 +56,8 @@ from rag.llm.musemind_gemini import (
     RETRYABLE_HTTP_STATUSES,
     TOTAL_DEADLINE_MS,
     GeminiPassage,
+    gemini_failure_class,
+    log_gemini_failure,
     provider_http_options,
     should_retain_pdf_image_for_embedding,
 )
@@ -134,8 +136,31 @@ def test_gemini_generation_v2_google_sdk_retry_budget_matches_total_deadline():
     waits = [actual["wait"](state) for state in states[:-1]]
 
     assert [actual["stop"](state) for state in states] == [False, False, True]
-    assert waits == [0, 0]
-    assert REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS + sum(waits) * 1000 == TOTAL_DEADLINE_MS
+    assert 1.0 <= waits[0] <= 1.5
+    assert 2.0 <= waits[1] <= 2.5
+    assert REQUEST_ATTEMPTS * REQUEST_TIMEOUT_MS + sum(waits) * 1000 <= TOTAL_DEADLINE_MS
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(429, "HTTP_429"), (503, "HTTP_5XX"), (400, "HTTP_4XX")],
+)
+def test_gemini_failure_class_is_content_free(status, expected):
+    error = RuntimeError("secret provider payload")
+    error.status_code = status
+
+    assert gemini_failure_class(error) == expected
+
+
+def test_gemini_failure_log_omits_exception_text(caplog):
+    error = RuntimeError("secret provider payload")
+    error.status_code = 429
+
+    with caplog.at_level("ERROR"):
+        log_gemini_failure("EMBEDDING", error)
+
+    assert "operation=EMBEDDING failure_class=HTTP_429 attempts=3" in caplog.text
+    assert "secret provider payload" not in caplog.text
 
 
 @pytest.mark.parametrize("value", ["", "   ", GeminiPassage("title", "\t")])
