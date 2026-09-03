@@ -216,7 +216,8 @@ constraint-dependencies = [
     "lxml_html_clean>=0.4.5",
     # inscriptis 2.7.0 pins lxml<6.0.0 and blocks the lxml security floor.
     "inscriptis>=2.7.3",
-    "nltk>=3.10.0",
+    "nltk>=3.10.3",
+    "thrift>=0.24.0",
     "protobuf>=5.29.6",
     "httplib2>=0.32.0",
     "orjson>=3.11.6",
