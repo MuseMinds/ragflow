@@ -22,15 +22,17 @@ EMBEDDING_IMAGE_BATCH_SIZE = 6
 MAX_TEXT_TOKENS = 8192
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 RETRYABLE_HTTP_STATUSES = (408, 429, 500, 502, 503, 504)
-# ADR-0086 retains three bounded attempts but adds exponential jitter so
+# ADR-0086 retains three bounded attempts and adds exponential jitter so
 # concurrent ingestion tasks do not synchronize an immediate retry wave.
-REQUEST_TIMEOUT_MS = 8_000
+# ADR-0087 restores the smallest per-attempt timeout proven by the exact live
+# candidate while retaining that jitter and a bounded request-plus-wait budget.
+REQUEST_TIMEOUT_MS = 10_000
 REQUEST_ATTEMPTS = 3
 RETRY_INITIAL_DELAY_SECONDS = 1.0
 RETRY_MAX_DELAY_SECONDS = 2.5
 RETRY_EXP_BASE = 2.0
 RETRY_JITTER_SECONDS = 0.5
-TOTAL_DEADLINE_MS = 30_000
+TOTAL_DEADLINE_MS = 34_000
 PRIVATE_IMAGE_FIELD = "_musemind_embedding_image"
 
 FIGURE_PROMPT_SHA256 = "97042f2f5ffa00cd18065e32b74841aa1a507bcd4c9a76d954dc0c91d42bab59"

@@ -17,6 +17,7 @@ from rag.llm.musemind_gemini import (
     MUSEMIND_GEMINI_EMBEDDING_MODEL,
     MUSEMIND_GEMINI_IMAGE_MODEL,
     GeminiPassage,
+    log_gemini_failure,
     provider_http_options,
 )
 
@@ -43,18 +44,29 @@ def run_probe(
 
     factory = client_factory or genai.Client
     client = factory(api_key=api_key, http_options=provider_http_options(types))
-    chat = client.models.generate_content(
-        model=MUSEMIND_GEMINI_CHAT_MODEL,
-        contents=[types.Content(role="user", parts=[types.Part(text="synthetic")])],
-        config=types.GenerateContentConfig(candidate_count=1, max_output_tokens=8, thinking_config=types.ThinkingConfig(thinking_budget=0)),
-    )
-    image = client.models.generate_content(
-        model=MUSEMIND_GEMINI_IMAGE_MODEL,
-        contents=[types.Content(role="user", parts=[types.Part(text="synthetic"), types.Part.from_bytes(data=_PNG, mime_type="image/png")])],
-        config=types.GenerateContentConfig(candidate_count=1, max_output_tokens=8, thinking_config=types.ThinkingConfig(thinking_budget=0)),
-    )
-    if not getattr(chat, "text", None) or not getattr(image, "text", None):
-        raise RuntimeError("Gemini probe response missing")
+    try:
+        chat = client.models.generate_content(
+            model=MUSEMIND_GEMINI_CHAT_MODEL,
+            contents=[types.Content(role="user", parts=[types.Part(text="synthetic")])],
+            config=types.GenerateContentConfig(candidate_count=1, max_output_tokens=8, thinking_config=types.ThinkingConfig(thinking_budget=0)),
+        )
+        if not getattr(chat, "text", None):
+            raise RuntimeError
+    except Exception as error:
+        log_gemini_failure("CHAT", error)
+        raise RuntimeError("Gemini CHAT probe failed") from None
+
+    try:
+        image = client.models.generate_content(
+            model=MUSEMIND_GEMINI_IMAGE_MODEL,
+            contents=[types.Content(role="user", parts=[types.Part(text="synthetic"), types.Part.from_bytes(data=_PNG, mime_type="image/png")])],
+            config=types.GenerateContentConfig(candidate_count=1, max_output_tokens=8, thinking_config=types.ThinkingConfig(thinking_budget=0)),
+        )
+        if not getattr(image, "text", None):
+            raise RuntimeError
+    except Exception as error:
+        log_gemini_failure("IMAGE_TO_TEXT", error)
+        raise RuntimeError("Gemini IMAGE_TO_TEXT probe failed") from None
 
     return {
         "schema_version": SCHEMA_VERSION,
