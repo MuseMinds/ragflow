@@ -213,6 +213,12 @@ COPY pyproject.toml uv.lock ./
 # this, stale Tsinghua URLs slip through and `uv sync --frozen` 404s on
 # packages that the Tsinghua mirror no longer carries.
 RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
+    --mount=type=secret,id=github_token,required=false \
+    if [ -s /run/secrets/github_token ]; then \
+        git config --global credential.helper \
+            '!f() { if [ "$1" = get ]; then echo "username=x-access-token"; echo "password=$(cat /run/secrets/github_token)"; fi; }; f'; \
+    fi; \
+    trap 'git config --global --unset-all credential.helper 2>/dev/null || true; rm -f /root/.gitconfig' EXIT; \
     if [ "$NEED_MIRROR" == "1" ]; then \
         sed -i 's|pypi.org|mirrors.aliyun.com/pypi|g' uv.lock; \
         sed -i 's|pypi.tuna.tsinghua.edu.cn|mirrors.aliyun.com/pypi|g' uv.lock; \
