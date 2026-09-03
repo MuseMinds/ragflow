@@ -55,7 +55,13 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/*
 
 # Download resource from GitHub to /usr/share/infinity
-RUN mkdir -p /usr/share/infinity/resource && \
+RUN --mount=type=secret,id=github_token,required=false \
+    if [ -s /run/secrets/github_token ]; then \
+        git config --global credential.helper \
+            '!f() { if [ "$1" = get ]; then echo "username=x-access-token"; echo "password=$(cat /run/secrets/github_token)"; fi; }; f'; \
+    fi; \
+    trap 'git config --global --unset-all credential.helper 2>/dev/null || true; rm -f /root/.gitconfig' EXIT; \
+    mkdir -p /usr/share/infinity/resource && \
     if [ "$NEED_MIRROR" == "1" ]; then \
         resource_repository=https://gitee.com/infiniflow/resource; \
     else \
