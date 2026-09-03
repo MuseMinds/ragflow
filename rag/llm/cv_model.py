@@ -40,6 +40,7 @@ from rag.llm.musemind_gemini import (
     MUSEMIND_GEMINI_IMAGE_MODEL,
     PAGE_PROMPT_SHA256,
     image_mime_type,
+    log_gemini_failure,
     provider_http_options,
 )
 
@@ -966,9 +967,9 @@ class GeminiCV(Base):
                 contents=contents,
                 **({"config": self._generation_v2_config()} if self._musemind_generation_v2 else {}),
             )
-        except Exception:
+        except Exception as error:
             if self._musemind_generation_v2:
-                logging.error("GeminiCV generation-v2 request failed")
+                log_gemini_failure("IMAGE_DESCRIPTION", error)
                 raise RuntimeError("Gemini image-description request failed") from None
             raise
         tokens = getattr(getattr(res, "usage_metadata", None), "total_token_count", None)
@@ -997,9 +998,9 @@ class GeminiCV(Base):
                 contents=contents,
                 **({"config": self._generation_v2_config()} if self._musemind_generation_v2 else {}),
             )
-        except Exception:
+        except Exception as error:
             if self._musemind_generation_v2:
-                logging.error("GeminiCV generation-v2 request failed")
+                log_gemini_failure("IMAGE_DESCRIPTION", error)
                 raise RuntimeError("Gemini image-description request failed") from None
             raise
         tokens = getattr(getattr(res, "usage_metadata", None), "total_token_count", None)

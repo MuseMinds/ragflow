@@ -43,6 +43,7 @@ from rag.llm.musemind_gemini import (
     MAX_TEXT_TOKENS,
     image_mime_type,
     is_musemind_gemini_embedding,
+    log_gemini_failure,
     provider_http_options,
 )
 
@@ -920,8 +921,8 @@ class GeminiEmbed(Base):
                 vectors.extend(self._parse_embedding_response(response))
         except (EmbeddingError, ValueError):
             raise
-        except Exception:
-            logger.error("GeminiEmbed generation-v2 request failed", extra={"item_count": len(values)})
+        except Exception as error:
+            log_gemini_failure("EMBEDDING", error)
             raise EmbeddingError("Gemini embedding request failed") from None
         return self._validate_generation_v2_vectors(vectors, len(values)), used_tokens
 
