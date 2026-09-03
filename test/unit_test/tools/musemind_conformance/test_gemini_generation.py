@@ -89,6 +89,6 @@ def test_gemini_probe_logs_content_free_failure_stage(model, stage, call_count, 
         )
 
     assert len(models.calls) == call_count
-    assert f"operation={stage} failure_class=HTTP_429 attempts=3" in caplog.text
+    assert f"operation={stage} failure_class=HTTP_429 attempts=5" in caplog.text
     assert secret not in caplog.text
     assert secret not in str(raised.value)
