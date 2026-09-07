@@ -82,6 +82,56 @@ class ScanSummaryTests(unittest.TestCase):
         value["Results"][0]["Secrets"] = []
         self.assertEqual(module.summarize(report(), value, IMAGE)["candidate_scan_gate"], "REVIEW_REQUIRED")
 
+    def test_mixed_trivy_inventory_and_three_secret_controls(self):
+        value = report(True)
+        inventory = [
+            {"Class": kind, "Type": package_type, "Target": "synthetic", "Packages": [{"Name": "synthetic"}]}
+            for kind, package_type in (("os-pkgs", "ubuntu"), ("lang-pkgs", "node-pkg"), ("lang-pkgs", "python-pkg"))
+        ]
+        matches = [(f"synthetic-control-{index}", "jwt-token" if index == 0 else "gcp-service-account") for index in range(3)]
+        controls = {hashlib.sha256(match.encode()).hexdigest(): rule for match, rule in matches}
+        value["Results"] = inventory + [{"Class": "secret", "Target": "synthetic", "Secrets": [{"Match": match, "RuleID": rule}]} for match, rule in matches]
+        with patch.object(module, "REVIEWED_SECRET_HASHES", controls):
+            summary = module.summarize(report(), value, IMAGE)
+            self.assertEqual(summary["candidate_scan_gate"], "SATISFIED")
+            self.assertEqual(len(summary["secret_matches"]), 3)
+            self.assertEqual(summary["missing_reviewed_secret_controls"], 0)
+            value["Results"][-1]["Secrets"][0]["Match"] = "unreviewed-synthetic-match"
+            summary = module.summarize(report(), value, IMAGE)
+            self.assertEqual(summary["candidate_scan_gate"], "REVIEW_REQUIRED")
+            self.assertEqual(summary["unreviewed_secret_count"], 1)
+            self.assertEqual(summary["missing_reviewed_secret_controls"], 1)
+            self.assertNotIn("unreviewed-synthetic-match", json.dumps(summary))
+
+    def test_inventory_only_is_not_secret_scanner_coverage(self):
+        value = report(True)
+        value["Results"] = report()["Results"]
+        with self.assertRaisesRegex(ValueError, "SECRET_SCANNER_COVERAGE_MISSING"):
+            module.summarize(report(), value, IMAGE)
+        value["Results"] = []
+        with self.assertRaisesRegex(ValueError, "SCAN_RESULTS_INVALID"):
+            module.summarize(report(), value, IMAGE)
+
+    def test_unexpected_classes_cannot_hide_secret_entries(self):
+        for entries in ([{"Match": "synthetic-private-canary", "RuleID": "jwt-token"}], None, {}, "", False, 0):
+            with self.subTest(entries_type=type(entries).__name__):
+                value = report(True)
+                value["Results"].append({"Class": "lang-pkgs", "Type": "python-pkg", "Packages": [{"Name": "synthetic"}], "Secrets": entries})
+                with self.assertRaises(ValueError) as caught:
+                    module.summarize(report(), value, IMAGE)
+                self.assertNotIn("synthetic-private-canary", str(caught.exception))
+
+    def test_malformed_secret_rows_fail_closed(self):
+        for changed in ({"Secrets": None}, {"Secrets": {}}, {"Secrets": [None]}, {"Secrets": ["synthetic"]}):
+            value = report(True)
+            value["Results"][0].update(changed)
+            with self.assertRaisesRegex(ValueError, "SECRET_SHAPE_INVALID"):
+                module.summarize(report(), value, IMAGE)
+        value = report(True)
+        del value["Results"][0]["Secrets"]
+        with self.assertRaisesRegex(ValueError, "SECRET_SHAPE_INVALID"):
+            module.summarize(report(), value, IMAGE)
+
 
 if __name__ == "__main__":
     unittest.main()
