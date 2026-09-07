@@ -540,6 +540,28 @@ test does not by itself qualify a runtime bundle.
   Review 0084's image-specific acceptance: a new candidate-specific risk disposition and the
   impacted qualification gates are still required. The workflow never deploys or grants readiness.
 
+## MM-RF-0020 — Preserve cancelled documents on task failure callbacks
+
+- Reason: local C05 cancellation remained RUNNING after the observation deadline. Independent
+  reproduction using unchanged methods from the compatible official v0.26.4 image
+  `sha256:16d24d1968ab59e2715a85d2590f1569c9539e0362344a42f3a23e8be06a655b` and candidate21eb9d809
+  proves CANCEL -> FAIL -> RUNNING: the worker's cancellation callback records task progress-1,
+  `TaskService.update_progress` overwrites the cancelled document, then progress aggregation sees
+  remaining pending tasks. The exact failed runtime stop acknowledgement was not retained; the
+  source counterexample is distinct evidence, not a reconstructed response.
+- Change: guard only the failure callback's document write with an atomic non-CANCEL predicate.
+  Keep the task failure/cancellation exception and the existing bounded database retry around the
+  document operation. Ordinary failures still become FAIL; cancelled document state and its marker
+  survive concurrent callbacks. This cannot be normalized at the private proxy because it is an
+  internal asynchronous provider state mutation.
+- Validation: focused SQLite-backed tests execute the actual source methods and cover the125-task
+  counterexample, ordinary states, cancellation races, timestamps and bounded retry without
+  duplicated task-log appends. Protected source CI runs the regression explicitly.
+- Scope: no new endpoint, timeout, retry budget for Gemini, provider credential, generation default
+  or application authority. No claim that every unrelated cancellation path has been repaired.
+  A fresh immutable build, scans/disposition and impacted C04/C05/C09 qualification are required
+  before deployment. Source regression success is not a live cancellation qualification PASS.
+
 ## Qualification status
 
 | Evidence | Status |

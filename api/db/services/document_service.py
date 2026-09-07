@@ -25,7 +25,7 @@ from api.constants import IMG_BASE64_PREFIX, FILE_NAME_LEN_LIMIT
 from api.db import PIPELINE_SPECIAL_PROGRESS_FREEZE_TASK_TYPES, FileType, UserTenantRole, CanvasCategory
 from api.db.db_models import DB, Document, Knowledgebase, Task, Tenant, UserTenant, File2Document, File, UserCanvas, User
 from api.db.db_utils import bulk_insert_into_db
-from api.db.services.common_service import CommonService, retry_deadlock_operation
+from api.db.services.common_service import CommonService, retry_db_operation, retry_deadlock_operation
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.doc_metadata_service import DocMetadataService
 
@@ -41,6 +41,18 @@ from rag.utils.redis_conn import REDIS_CONN
 
 class DocumentService(CommonService):
     model = Document
+
+    @classmethod
+    @DB.connection_context()
+    @retry_db_operation
+    def fail_if_not_cancelled(cls, doc_id, info):
+        """Apply task failure metadata without replacing a concurrent cancellation."""
+        info = dict(info, run=TaskStatus.FAIL.value, update_time=current_timestamp(), update_date=get_format_time())
+        return (
+            cls.model.update(info)
+            .where((cls.model.id == doc_id) & ((cls.model.run.is_null(True)) | (cls.model.run != TaskStatus.CANCEL.value)))
+            .execute()
+        )
 
     @classmethod
     def get_cls_model_fields(cls):
