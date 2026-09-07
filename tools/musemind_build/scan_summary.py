@@ -66,13 +66,31 @@ def summarize(vulnerability: dict, secret: dict, image_id: str) -> dict:
                     review_findings.append({"severity": severity, **identity})
     secret_matches = []
     unreviewed_secrets = 0
+    secret_result_count = 0
     for result in results(secret, image_id):
-        if result.get("Class") != "secret":
-            raise ValueError("SECRET_SCANNER_COVERAGE_MISSING")
-        entries = result.get("Secrets") or []
+        entries = result.get("Secrets", [])
         if not isinstance(entries, list):
             raise ValueError("SECRET_SHAPE_INVALID")
+        if result.get("Class") != "secret":
+            # Trivy also emits inventory-only result rows in
+            # secret reports. They never establish secret-scanner coverage.
+            if entries:
+                raise ValueError("SECRET_ENTRIES_IN_UNEXPECTED_CLASS")
+            if (
+                result.get("Class") not in {"os-pkgs", "lang-pkgs"}
+                or not isinstance(result.get("Type"), str)
+                or not result["Type"]
+                or not isinstance(result.get("Packages"), list)
+                or not all(isinstance(package, dict) for package in result["Packages"])
+            ):
+                raise ValueError("SECRET_INVENTORY_SHAPE_INVALID")
+            continue
+        if "Secrets" not in result:
+            raise ValueError("SECRET_SHAPE_INVALID")
+        secret_result_count += 1
         for item in entries:
+            if not isinstance(item, dict):
+                raise ValueError("SECRET_SHAPE_INVALID")
             match, rule = item.get("Match"), item.get("RuleID")
             if not isinstance(match, str) or not isinstance(rule, str):
                 raise ValueError("SECRET_SHAPE_INVALID")
@@ -81,6 +99,8 @@ def summarize(vulnerability: dict, secret: dict, image_id: str) -> dict:
             unreviewed_secrets += int(not reviewed)
             # Hashes/counts only: an unknown rule/title/path might itself contain material.
             secret_matches.append({"match_sha256": digest, "reviewed": reviewed})
+    if not secret_result_count:
+        raise ValueError("SECRET_SCANNER_COVERAGE_MISSING")
     observed_controls = {item["match_sha256"] for item in secret_matches if item["reviewed"]}
     missing_secret_controls = len(set(REVIEWED_SECRET_HASHES) - observed_controls)
     eligible = not (counts["CRITICAL"] or counts["UNKNOWN"] or unreviewed_high or unreviewed_secrets or missing_secret_controls)
