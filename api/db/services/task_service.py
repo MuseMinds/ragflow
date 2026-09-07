@@ -416,10 +416,10 @@ class TaskService(CommonService):
             process_duration = (datetime.now() - begin_at).total_seconds()
             cls.model.update(process_duration=process_duration).where(cls.model.id == id).execute()
         if info.get("progress") == -1:
-            doc_info = {"progress": -1, "run": TaskStatus.FAIL.value, "update_time": current_timestamp(), "update_date": get_format_time()}
+            doc_info = {"progress": -1}
             if info.get("progress_msg"):
                 doc_info["progress_msg"] = trim_header_by_lines((task.progress_msg or "") + "\n" + info["progress_msg"], TASK_MAX_LOG_LENGTH)
-            DocumentService.update_by_id(task.doc_id, doc_info)
+            DocumentService.fail_if_not_cancelled(task.doc_id, doc_info)
 
     @classmethod
     @DB.connection_context()

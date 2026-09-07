@@ -56,6 +56,9 @@ jobs:
       - name: Test candidate scan evidence guards
         run: .venv/bin/python -B -m unittest discover -s tools/musemind_build -p 'test_*.py'
 
+      - name: Preserve document cancellation across task callbacks
+        run: .venv/bin/pytest test/unit_test/api/db/test_musemind_cancelled_document_progress.py
+
       - name: Reject whitespace errors
         run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
 
