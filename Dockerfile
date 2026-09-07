@@ -244,6 +244,12 @@ RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
     # Ensure pip is available in the venv for runtime package installation (fixes #12651)
     .venv/bin/python3 -m ensurepip --upgrade
 
+# Apply the source-hash-guarded MM-RF-0019 correction to the locked decoder.
+# Atomic replacement preserves uv's shared package cache; no runtime hook is installed.
+COPY tools/musemind_patches tools/musemind_patches
+RUN .venv/bin/python tools/musemind_patches/werkzeug_multipart.py && \
+    .venv/bin/python tools/musemind_patches/werkzeug_multipart.py --verify
+
 # Build the Python SDK from the same source revision as the server. MuseMind
 # qualification records the checksum of this wheel together with the OCI image
 # digest, so the tested provider contract cannot drift from its client artifact.
@@ -308,6 +314,7 @@ COPY common common
 COPY memory memory
 COPY bin bin
 COPY tools/scripts tools/scripts
+COPY tools/musemind_patches tools/musemind_patches
 COPY tools/musemind_conformance/__init__.py tools/musemind_conformance/jina_generation.py tools/musemind_conformance/gemini_generation.py tools/musemind_conformance/
 RUN python3 -c "import tools.musemind_conformance.jina_generation, tools.musemind_conformance.gemini_generation"
 

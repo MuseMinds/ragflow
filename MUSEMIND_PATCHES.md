@@ -513,6 +513,33 @@ test does not by itself qualify a runtime bundle.
   dataset/index set and binding. Never switch only a model over an index built in the other
   embedding space, reuse vectors across generations or fall back automatically.
 
+## Patch MM-RF-0019 — multipart source-byte preservation
+
+- Trigger: native HTTPX multipart fragments through Quart 0.20.0 / Werkzeug 3.1.5 add CRLF to
+  an uploaded synthetic document. The compatible official v0.26.4 image at
+  `sha256:16d24d1968ab59e2715a85d2590f1569c9539e0362344a42f3a23e8be06a655b` reproduces the same
+  189-to-191-byte mismatch in MuseMindMonoRepo run `34095778031`. Werkzeug 3.1.8 still fails with
+  one-byte fragments. Transport coalescing cannot control downstream fragmentation, and stripping
+  whitespace would corrupt legitimate source bytes, so the proxy cannot safely contain this bug.
+- Correction: apply a precise, version/source-hash-guarded patch to the locked Werkzeug decoder
+  during the image build. Correct data-start offsets and retain incomplete closing/whitespace
+  delimiters until they can be classified. Preserve the upstream package license. Atomic file
+  replacement leaves uv's package cache intact; no runtime monkeypatch or content normalization.
+- Validation: actual Quart multipart parsing under native HTTPX chunks and deterministic
+  fragmentation, including binary/empty/CRLF payloads, multiple fields/files, boundary lookalikes,
+  permitted delimiter whitespace and resource limits. The applicator fails closed on unexpected
+  versions or source hashes; verification mode makes no changes.
+- Scope: no embedding/generation, request authority, tenant ownership, create-only semantics,
+  provider IDs or stored-document rewrites. Existing corrupt documents are not repaired by this
+  source change. Application C-01 and the impacted bundle qualification remain mandatory before
+  any new digest replaces the frozen image. This entry is not a qualification result.
+- Candidate build: manually dispatch `musemind-build-candidate.yml` from the protected branch with
+  its exact HEAD after protected source CI succeeds. It uses an ephemeral standard runner, builds
+  without cache, verifies the final decoder and compares full scan findings with the 0084 baseline
+  before publishing only an immutable ECR candidate. A matching finding set does not inherit
+  Review 0084's image-specific acceptance: a new candidate-specific risk disposition and the
+  impacted qualification gates are still required. The workflow never deploys or grants readiness.
+
 ## Qualification status
 
 | Evidence | Status |

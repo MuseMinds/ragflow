@@ -1,0 +1,230 @@
+name: MuseMind build candidate image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact protected musemind HEAD whose provider-contract push run passed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musemind-build-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.repository == 'MuseMinds/ragflow' && github.ref == 'refs/heads/musemind'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 210
+    environment: develop
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      DISPATCH_SHA: ${{ github.sha }}
+      AWS_REGION: eu-north-1
+      TARGET_ACCOUNT: '078434747349'
+      TARGET_REPOSITORY: musemind/develop/rag/ragflow
+      SYFT_IMAGE: anchore/syft@sha256:1288ea4c8b38767b4e620c1e312c8cb26b6e887a99b4f07ab6cd19fc6f225026
+      TRIVY_IMAGE: aquasec/trivy@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+    steps:
+      - name: Verify exact protected source and completed source CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$SOURCE_SHA" = "$DISPATCH_SHA"
+          branch="$(gh api repos/MuseMinds/ragflow/branches/musemind)"
+          test "$(jq -r '.commit.sha' <<<"$branch")" = "$SOURCE_SHA"
+          test "$(jq -r '.protected' <<<"$branch")" = true
+          successful="$(gh run list --repo MuseMinds/ragflow --workflow musemind-provider-contract.yml \
+            --branch musemind --commit "$SOURCE_SHA" --event push --status success --limit 10 \
+            --json headSha,conclusion,status)"
+          test "$(jq --arg sha "$SOURCE_SHA" '[.[] | select(.headSha==$sha and .conclusion=="success" and .status=="completed")] | length' <<<"$successful")" -ge 1
+
+      - name: Check out the protected commit without persisted credentials
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bound disk usage on the disposable standard runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$RUNNER_OS" = Linux
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          df -h /
+          # Exact unused SDK roots from actions/runner-images installation scripts.
+          # Do not remove the whole hosted toolcache, Docker, Python or Node runtime.
+          for sdk in /usr/share/dotnet /usr/local/lib/android /usr/local/.ghcup /opt/hostedtoolcache/CodeQL; do
+            if [[ -d "$sdk" && ! -L "$sdk" ]]; then
+              test "$(readlink -f -- "$sdk")" = "$sdk"
+              sudo rm -rf --one-file-system -- "$sdk"
+            fi
+          done
+          sudo apt-get clean
+          df -h /
+          available="$(df -PB1 "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')"
+          test "$available" -ge 42949672960
+          mkdir -p "$RUNNER_TEMP/musemind-build/raw" "$RUNNER_TEMP/musemind-build/summary"
+          chmod 700 "$RUNNER_TEMP/musemind-build/raw"
+
+      - name: Validate summary privacy guards and capture source hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/musemind_build -p 'test_*.py'
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          paths = ["api/apps/restful_apis/document_api.py", "api/db/services/file_service.py",
+                   "rag/llm/musemind_gemini.py", "tools/musemind_patches/werkzeug_multipart.py",
+                   "tools/musemind_patches/werkzeug-multipart.patch"]
+          result = {"source_commit": os.environ["SOURCE_SHA"],
+                    "version": subprocess.check_output(["git", "describe", "--tags", "--match=v*", "--first-parent", "--always"], text=True).strip(),
+                    "files": {path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() for path in paths},
+                    "patch_ledger_sha256": hashlib.sha256(pathlib.Path("MUSEMIND_PATCHES.md").read_bytes()).hexdigest(),
+                    "dockerfile_sha256": hashlib.sha256(pathlib.Path("Dockerfile").read_bytes()).hexdigest(),
+                    "lockfile_sha256": hashlib.sha256(pathlib.Path("uv.lock").read_bytes()).hexdigest()}
+          output = pathlib.Path(os.environ["RUNNER_TEMP"]) / "musemind-build/summary/source.json"
+          output.write_text(json.dumps(result, sort_keys=True) + "\n")
+          print(json.dumps(result, sort_keys=True))
+          PY
+
+      - name: Build full linux amd64 image without cache or build secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DOCKER_BUILDKIT=1
+          timeout 90m docker build --no-cache --pull=false --platform linux/amd64 \
+            --progress=plain --tag "musemind-candidate:$SOURCE_SHA" \
+            --iidfile "$RUNNER_TEMP/musemind-build/summary/image-id.txt" .
+          test "$(docker image inspect "musemind-candidate:$SOURCE_SHA" --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
+          # Free build-only layers before scanning the retained final image.
+          docker builder prune --all --force
+          df -h /
+
+      - name: Verify exact runtime sources and actual Quart multipart parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 5m docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=32m --entrypoint python3 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/tools/musemind_build/runtime_smoke.py,dst=/candidate-smoke.py,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/musemind-build/summary/source.json,dst=/candidate-source.json,readonly" \
+            "musemind-candidate:$SOURCE_SHA" /candidate-smoke.py /candidate-source.json \
+            > "$RUNNER_TEMP/musemind-build/summary/runtime.json"
+          cat "$RUNNER_TEMP/musemind-build/summary/runtime.json"
+
+      - name: Full image SBOM and refreshed vulnerability and secret scans
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "$SYFT_IMAGE"
+          docker pull --platform linux/amd64 "$TRIVY_IMAGE"
+          docker run --rm --network none "$SYFT_IMAGE" version > "$RUNNER_TEMP/musemind-build/summary/syft-version.txt"
+          docker run --rm --network none "$TRIVY_IMAGE" --version > "$RUNNER_TEMP/musemind-build/summary/trivy-version.txt"
+          grep -Eq '^Version:[[:space:]]+1\.50\.0$' "$RUNNER_TEMP/musemind-build/summary/syft-version.txt"
+          grep -Eq '^Version:[[:space:]]+0\.70\.0$' "$RUNNER_TEMP/musemind-build/summary/trivy-version.txt"
+          cat "$RUNNER_TEMP/musemind-build/summary/syft-version.txt" "$RUNNER_TEMP/musemind-build/summary/trivy-version.txt"
+          timeout 20m docker run --rm --network none \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/musemind-build/raw:/reports" \
+            "$SYFT_IMAGE" scan "docker:musemind-candidate:$SOURCE_SHA" -o cyclonedx-json=/reports/sbom.json
+          # A new runner has no persisted scanner databases; no cache or skip-update flag is used.
+          timeout 35m docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/musemind-build/raw:/reports" \
+            "$TRIVY_IMAGE" image --image-src docker --scanners vuln --list-all-pkgs --timeout 30m \
+            --format json --output /reports/vulnerabilities.json "musemind-candidate:$SOURCE_SHA"
+          timeout 35m docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/musemind-build/raw:/reports" \
+            "$TRIVY_IMAGE" image --image-src docker --scanners secret --timeout 30m \
+            --format json --output /reports/secrets.json "musemind-candidate:$SOURCE_SHA"
+          python3 tools/musemind_build/scan_summary.py --reports "$RUNNER_TEMP/musemind-build/raw" \
+            --image-id "$(cat "$RUNNER_TEMP/musemind-build/summary/image-id.txt")" --source-sha "$SOURCE_SHA" \
+            --output "$RUNNER_TEMP/musemind-build/summary/scans.json"
+
+      - name: Obtain the existing publisher role only after local checks
+        uses: aws-actions/configure-aws-credentials@451ce2a72e8d729a59ebeaacab82dbce58e7af4c # v6
+        with:
+          aws-region: eu-north-1
+          role-to-assume: ${{ vars.AWS_IMAGE_PUBLISHER_ROLE_ARN_DEVELOP }}
+          role-duration-seconds: 3600
+          allowed-account-ids: '078434747349'
+
+      - name: Verify STS and require an unused immutable candidate tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(aws sts get-caller-identity --region "$AWS_REGION" --query Account --output text)" = "$TARGET_ACCOUNT"
+          tag="candidate-$SOURCE_SHA"
+          if aws ecr describe-images --region "$AWS_REGION" --repository-name "$TARGET_REPOSITORY" \
+            --image-ids "imageTag=$tag" > /dev/null 2> "$RUNNER_TEMP/musemind-build/ecr-check.err"; then
+            echo 'STOPPED: immutable candidate tag already exists; inspect the existing candidate.'
+            exit 1
+          fi
+          grep -q '(ImageNotFoundException)' "$RUNNER_TEMP/musemind-build/ecr-check.err"
+
+      - id: ecr
+        name: Log in to the existing develop ECR
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Push only the candidate and read back its exact manifest
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          test "$REGISTRY" = "$TARGET_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com"
+          target="$REGISTRY/$TARGET_REPOSITORY:candidate-$SOURCE_SHA"
+          docker tag "musemind-candidate:$SOURCE_SHA" "$target"
+          docker push "$target"
+          aws ecr batch-get-image --region "$AWS_REGION" --repository-name "$TARGET_REPOSITORY" \
+            --image-ids "imageTag=candidate-$SOURCE_SHA" > "$RUNNER_TEMP/musemind-build/registry.json"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "musemind-build"
+          value = json.loads((root / "registry.json").read_text())
+          assert not value.get("failures") and len(value["images"]) == 1
+          image = value["images"][0]
+          manifest = image["imageManifest"]
+          digest = "sha256:" + hashlib.sha256(manifest.encode()).hexdigest()
+          assert image["imageId"]["imageDigest"] == digest
+          assert json.loads(manifest)["config"]["digest"] == (root / "summary/image-id.txt").read_text().strip()
+          result = {"source_commit": os.environ["SOURCE_SHA"], "candidate_manifest_digest": digest,
+                    "image_config_digest": json.loads(manifest)["config"]["digest"], "qualification_granted": False}
+          (root / "summary/registry.json").write_text(json.dumps(result) + "\n")
+          print(json.dumps(result))
+          PY
+          docker logout "$REGISTRY"
+
+      - name: Keep only content-free job summaries
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## RAGFlow candidate only — no deployment or qualification' >> "$GITHUB_STEP_SUMMARY"
+          for report in source runtime scans registry; do
+            path="$RUNNER_TEMP/musemind-build/summary/$report.json"
+            if [[ -f "$path" ]]; then
+              printf '\n```json\n' >> "$GITHUB_STEP_SUMMARY"
+              cat "$path" >> "$GITHUB_STEP_SUMMARY"
+              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          # Raw scans are never logged, committed, cached or uploaded as public artifacts.
+          if [[ -d "$RUNNER_TEMP/musemind-build/raw" ]]; then
+            test "$(readlink -f "$RUNNER_TEMP/musemind-build/raw")" = "$RUNNER_TEMP/musemind-build/raw"
+            rm -rf --one-file-system -- "$RUNNER_TEMP/musemind-build/raw"
+          fi
