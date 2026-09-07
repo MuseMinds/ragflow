@@ -68,6 +68,10 @@ nearest applicable instructions over remembered project shape.
   workflow unless the destination manifest digest exactly equals the reviewed source digest.
 - Any unavoidable pilot patch remains a small `mm/*` branch change with focused tests, patch-ledger
   update and full dependency-scoped qualification before its digest can replace the frozen one.
+- After syncing the Python environment, apply and verify the locked multipart correction with
+  `python tools/musemind_patches/werkzeug_multipart.py` and the same command with `--verify`.
+  Docker and protected CI perform these steps. A version or source-hash mismatch is a failure;
+  never bypass the guard or edit uv's shared package cache. See patch MM-RF-0019 in the ledger.
 - ADR-0037's first API generation is the exact Jina v3 request contract recorded in
   `MUSEMIND_PATCHES.md`. Reconcile its service-tenant key only through the schema-aware one-shot;
   provider/model/request changes require a new immutable generation, key rotation does not, and no

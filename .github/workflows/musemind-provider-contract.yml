@@ -45,6 +45,17 @@ jobs:
           uv sync --python 3.13 --group test --frozen
           uv pip install -e sdk/python
 
+      - name: Apply and verify locked multipart byte-preservation correction
+        run: |
+          .venv/bin/python tools/musemind_patches/werkzeug_multipart.py
+          .venv/bin/python tools/musemind_patches/werkzeug_multipart.py --verify
+
+      - name: Test multipart byte preservation through Quart
+        run: .venv/bin/pytest test/unit_test/tools/test_musemind_multipart*.py
+
+      - name: Test candidate scan evidence guards
+        run: .venv/bin/python -B -m unittest discover -s tools/musemind_build -p 'test_*.py'
+
       - name: Reject whitespace errors
         run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
 
@@ -67,6 +78,7 @@ jobs:
           ! grep -q 'agentrun-sdk' pyproject.toml
           ! grep -q 'selenium-wire' pyproject.toml uv.lock
           grep -Fq '"selenium==4.32.0"' pyproject.toml
+          grep -Fq 'RUN .venv/bin/python tools/musemind_patches/werkzeug_multipart.py' Dockerfile
 
       - name: Verify locked C-01 remediation floors
         run: |
@@ -222,6 +234,13 @@ jobs:
           tools/musemind_conformance/exact_scope.py
           tools/musemind_conformance/jina_generation.py
           tools/musemind_conformance/gemini_generation.py
+
+      - name: Lint multipart build correction and regressions
+        run: >-
+          uvx --from ruff==0.16.0 ruff check --select E9,F
+          tools/musemind_patches
+          tools/musemind_build
+          test/unit_test/tools/test_musemind_multipart*.py
 
       - name: Test remediated embedding provider contracts
         run: >-
