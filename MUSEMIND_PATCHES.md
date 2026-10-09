@@ -817,6 +817,19 @@ own repositories, not to this provider ledger.
   simultaneous ingestion on that bundle. The failed campaigns and old generation identities
   remain unchanged; neither the diagnostic reproduction nor unit tests supplies a live PASS.
 
+## MM-RF-0028 — Claude Code instruction import (non-runtime)
+
+- Reason: upstream tracks `CLAUDE.md` as a symlink to `AGENTS.md`. Windows checkouts without
+  `core.symlinks` materialize it as a plain-text file containing only `AGENTS.md`; because a
+  `CLAUDE.md` exists, Claude Code then skips `AGENTS.md` and loses the governed-fork rules.
+- Change: replace the symlink with a regular `CLAUDE.md` containing only the `@AGENTS.md` import.
+  `AGENTS.md` remains the single instruction source for Codex and Claude Code. `web/CLAUDE.md`
+  stays upstream content.
+- Validation: `git ls-files -s CLAUDE.md` reports mode `100644`; protected source CI unchanged.
+- Scope: agent instructions only. No source, dependency, image, SDK or served behavior change; no
+  rebuild, scan disposition or qualification gate is required, and the qualified bundle pin is
+  unchanged. Upstream syncs that touch `CLAUDE.md` keep this regular-file form.
+
 ## Qualification status
 
 | Evidence | Status |
