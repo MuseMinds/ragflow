@@ -54,6 +54,7 @@ from api.utils.reference_metadata_utils import (
     resolve_reference_metadata_preferences,
 )
 from common import settings
+from common.compilation_template import compilation_template_kind as _compilation_template_kind
 from common.constants import LLMType, ParserType, RetCode, TaskStatus
 from common.doc_store.doc_store_base import OrderByExpr
 from common.metadata_utils import convert_conditions, meta_filter
@@ -195,15 +196,6 @@ def _get_dataset_tenant_id(dataset_id):
     if not ok:
         return None
     return kb.tenant_id
-
-
-def _compilation_template_kind(kind) -> str:
-    if not isinstance(kind, str):
-        return ""
-    normalized = kind.strip().lower().replace("-", "_")
-    if normalized in {"pageindex", "page_index", "knowledge_graph"}:
-        return "timeline"
-    return normalized
 
 
 def _resolve_reference_metadata(req: dict, search_config: dict | None = None):

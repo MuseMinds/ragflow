@@ -93,7 +93,10 @@ jobs:
                    "tools/musemind_patches/werkzeug-multipart.patch",
                    "rag/utils/es_conn.py", "rag/app/naive.py", "rag/nlp/synonym.py",
                    "api/utils/musemind_provider_contract.py", "api/apps/restful_apis/dataset_api.py",
-                   "api/apps/services/dataset_api_service.py"]
+                   "api/apps/services/dataset_api_service.py",
+                   "common/compilation_template.py", "api/apps/restful_apis/chunk_api.py",
+                   "rag/svr/task_executor_refactor/chunk_post_processor.py",
+                   "rag/svr/task_executor_refactor/dataset_wiki_generator.py"]
           result = {"source_commit": os.environ["SOURCE_SHA"],
                     "version": subprocess.check_output(["git", "describe", "--tags", "--match=v*", "--first-parent", "--always"], text=True).strip(),
                     "files": {path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() for path in paths},

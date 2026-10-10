@@ -32,6 +32,7 @@ from timeit import default_timer as timer
 from typing import Dict, List
 
 from common.constants import TAG_FLD, LLMType
+from common.compilation_template import compilation_template_kind as _compilation_template_kind
 from common.metadata_utils import turn2jsonschema, update_metadata_to
 from common import settings
 from rag.nlp import rag_tokenizer
@@ -915,8 +916,6 @@ async def run_document_structure_compile(handler, embedding_model: LLMBundle) ->
     generate synthesis output (wiki pages, essence paragraphs, etc.).
     Compile_kwd and REFINE prompt are read from the template config.
     """
-    from api.apps.restful_apis.chunk_api import _compilation_template_kind
-
     ctx = handler._task_context
     template_ids = _parser_config_compilation_template_ids(ctx.parser_config, ctx.tenant_id)
     if not template_ids:

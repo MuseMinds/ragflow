@@ -754,6 +754,35 @@ own repositories, not to this provider ledger.
   transferred. Rollback uses a previously qualified whole bundle/generation, never an in-place
   change to stored generation identities or existing datasets.
 
+## MM-RF-0026 — keep ingestion compilation helpers independent of web startup
+
+- Base: protected MuseMind `99b4549bc890fd5586459974885e59fd2410088f`, unchanged upstream
+  `v0.26.4`. No upstream sync or dependency/model/parser/ranking change.
+- Trigger: the fresh local C-04 campaign on candidate manifest
+  `sha256:c42519813e9c24cc1960f08ab2864446e2bd7927e1866123634522e64235c7ac`
+  stalled while processing synthetic PDF and text concurrently. One document stopped at
+  progress 0.65 and another at 0.9 after indexing one chunk; no database lock wait was observed.
+  A Python stack snapshot showed the event-loop thread loading `msgspec` through the entire
+  `api.apps`/Quart application from `run_document_structure_compile`, while the PDF thread
+  was inspecting native libraries through `threadpoolctl` during column clustering.
+  This is consistent with a loader/GIL lock inversion; native stack capture failed, so the
+  exact native lock cycle is not asserted as proven. The campaign was stopped and retained
+  as `ABORTED_NOT_QUALIFIED`; none of its unfinished gates is recorded as passed.
+- Correction: move the unchanged compilation-kind normalization into the pure
+  `common/compilation_template.py` helper. The web route retains its existing private alias;
+  both document post-processing and dataset wiki generation import the helper directly.
+  Neither worker imports the web application merely to classify a compilation template.
+  Supported kinds, input normalization and existing configured-template behavior stay unchanged.
+- Files: the helper, `api/apps/restful_apis/chunk_api.py`, and the two ingestion callers
+  `chunk_post_processor.py`/`dataset_wiki_generator.py`. Required CI exercises the isolated
+  import boundary and representative existing template kinds. The candidate-image smoke
+  verifies all four changed runtime files against the exact protected source.
+- Validation limits: focused source tests establish helper equivalence and the removed import
+  edge, not native deadlock reproduction or a live qualification pass. Repeat the bounded
+  simultaneous PDF/text ingestion on the final clean image, then complete the already required
+  frozen qualification before publication. Preserve the failed campaign and old immutable
+  generations; a rebuilt image requires fresh identity/scans and an applicable risk disposition.
+
 ## Qualification status
 
 | Evidence | Status |

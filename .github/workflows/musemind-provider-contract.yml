@@ -63,6 +63,9 @@ jobs:
       - name: Preserve document cancellation across task callbacks
         run: .venv/bin/pytest test/unit_test/api/db/test_musemind_cancelled_document_progress.py
 
+      - name: Keep ingestion compilation helpers independent of the web application
+        run: .venv/bin/pytest --noconftest test/unit_test/rag/svr/task_executor_refactor/test_compilation_import_boundary.py
+
       - name: Preserve plain Markdown heading and body boundaries
         run: .venv/bin/python -B -m unittest discover -s test/unit_test/rag/app -p 'test_markdown_heading_boundaries.py' -v
 
@@ -199,6 +202,9 @@ jobs:
           rag/svr/task_executor.py
           rag/svr/task_executor_refactor/chunk_service.py
           rag/svr/task_executor_refactor/embedding_service.py
+          common/compilation_template.py
+          rag/svr/task_executor_refactor/chunk_post_processor.py
+          rag/svr/task_executor_refactor/dataset_wiki_generator.py
           rag/utils/base64_image.py
           rag/utils/es_conn.py
           deepdoc/parser/mineru_parser.py
