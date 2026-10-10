@@ -783,6 +783,40 @@ own repositories, not to this provider ledger.
   frozen qualification before publication. Preserve the failed campaign and old immutable
   generations; a rebuilt image requires fresh identity/scans and an applicable risk disposition.
 
+## MM-RF-0027 — explicit Gemini vector dimensions at index creation
+
+- Base: protected MuseMind `6141277f568c3547be25e5ee58c10c5a4562f016`, unchanged upstream
+  `v0.26.4`. The only runtime change adds the `*_3072_vec` template to `conf/mapping.json`,
+  alongside the existing 512/768/1024/1536 templates: dense_vector, dims 3072, index true,
+  cosine. These retain the float/indexed/cosine defaults previously inferred by ES 8.11.3.
+- Trigger: two retained local C-04 runs on the preceding candidate each failed one different
+  document after embedding, with an Elasticsearch bulk-item null_pointer_exception. The
+  original server INFO trace located the failure in mapping preflight at
+  `FieldMapper$Parameter.merge(FieldMapper.java:803)`. ES 8.11.3's
+  [parameter conflict formatting](https://github.com/elastic/elasticsearch/blob/v8.11.3/server/src/main/java/org/elasticsearch/index/mapper/FieldMapper.java#L803)
+  invokes the conflict serializer; the
+  [dense-vector dimensions parameter](https://github.com/elastic/elasticsearch/blob/v8.11.3/server/src/main/java/org/elasticsearch/index/mapper/vectors/DenseVectorFieldMapper.java)
+  uses a non-null-safe serializer when an already resolved dimension conflicts with null.
+- Diagnostic evidence: a bounded local probe on the unchanged ES image created a fresh
+  explicit-3072 field, then submitted a late dimensionless mapping. It returned HTTP 500/NPE
+  with the same first ten Java frames as the original trace; an exact-3072 control returned
+  HTTP 200/acknowledged and retained the field. This reproduces the conflict mechanism, not
+  the original concurrent interleaving. An earlier four-document concurrent synthetic probe
+  did not reproduce the failure; it remains NOT_REPRODUCED, not a qualification pass.
+- Scope: eliminate dimension inference for this already selected embedding size on newly
+  created indices. Preserve all prior templates, settings and configured field schemas.
+  Existing index mappings are not rewritten, failed documents are not retried by this patch,
+  and `create_idx` is unchanged. No model, dependency, parser, ranking or retry-policy change.
+- Validation: `test/unit_test/rag/utils/test_es_vector_mapping.py` resolves the actual ordered
+  name templates, including earlier regex rules, for Gemini 3072, historical Jina 1024 and all
+  other configured vector sizes. It rejects unintended size/name matches and checks existing
+  nonvector field mappings. It is a configuration regression, not a server concurrency test.
+- Qualification: this source change requires a new immutable image/generation identity,
+  fresh image evidence and applicable risk disposition, and the complete required frozen
+  C-01–C-09 qualification before publication. Verify the exact final-image mapping and repeat
+  simultaneous ingestion on that bundle. The failed campaigns and old generation identities
+  remain unchanged; neither the diagnostic reproduction nor unit tests supplies a live PASS.
+
 ## Qualification status
 
 | Evidence | Status |
