@@ -71,8 +71,21 @@ jobs:
           test/unit_test/rag/utils/test_es_hybrid_candidates.py
           test/unit_test/rag/utils/test_es_exact_scope_provenance.py
 
-      - name: Reject whitespace errors
-        run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
+      - name: Preserve historical patch receipts and reject source whitespace errors
+        run: |
+          # Unified-diff blank context lines contain a required single space. These four
+          # historical receipts are byte-frozen instead of being rewritten for diff --check.
+          sha256sum --check <<'HASHES'
+          69a0b32505d38e30a49cf0e83da264e4d904dba5742cd1ff25e1890cb547d66c  tools/musemind_patches/mm-rf-0021/ledger.diff
+          ae245f34685e44d5cae322a9fca0da6657bc92106261a62a18c7c499bac91523  tools/musemind_patches/mm-rf-0021/source.patch
+          b196f26e9e47f8b57ed5ca012cfe04b24617347e87ddb91baf7ac7a49d8796c5  tools/musemind_patches/mm-rf-0022/source.patch
+          54abec2081047649087fbe340a1435c1c9b063a4d24336a0bb296c71b64bdf1e  tools/musemind_patches/mm-rf-0022/source-02.patch
+          HASHES
+          git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}" -- . \
+            ':!tools/musemind_patches/mm-rf-0021/ledger.diff' \
+            ':!tools/musemind_patches/mm-rf-0021/source.patch' \
+            ':!tools/musemind_patches/mm-rf-0022/source.patch' \
+            ':!tools/musemind_patches/mm-rf-0022/source-02.patch'
 
       - name: Require immutable C-01 build inputs
         run: |
