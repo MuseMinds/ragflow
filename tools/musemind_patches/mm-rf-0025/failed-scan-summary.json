@@ -1,0 +1,175 @@
+{
+  "candidate_scan_gate": "REVIEW_REQUIRED",
+  "candidate_specific_risk_disposition_required": true,
+  "comparison_basis": "0084 finding identities only; image risk acceptance is not inherited",
+  "finding_identity_limit": 100,
+  "high_critical_findings": [
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102268",
+      "severity": "CRITICAL"
+    },
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102266",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102267",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102271",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102272",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.14.0",
+      "InstalledVersion": "2.13.0",
+      "PkgName": "PyJWT",
+      "VulnerabilityID": "CVE-2026-102273",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "4.14.2",
+      "InstalledVersion": "4.12.1",
+      "PkgName": "anyio",
+      "VulnerabilityID": "CVE-2026-63374",
+      "severity": "CRITICAL"
+    },
+    {
+      "FixedVersion": "2026.6.0",
+      "InstalledVersion": "2026.1.0",
+      "PkgName": "fsspec",
+      "VulnerabilityID": "CVE-2026-104851",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "",
+      "InstalledVersion": "3.10.3",
+      "PkgName": "nltk",
+      "VulnerabilityID": "CVE-2026-81726",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.17.0",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102993",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.18.0",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102994",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.18.1",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102995",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.18.1",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102996",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.18.1",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102997",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.19.0",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102998",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.19.0",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-102999",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "6.19.0",
+      "InstalledVersion": "6.15.0",
+      "PkgName": "pypdf",
+      "VulnerabilityID": "CVE-2026-103000",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.8.0",
+      "InstalledVersion": "2.7.0",
+      "PkgName": "urllib3",
+      "VulnerabilityID": "CVE-2026-97687",
+      "severity": "HIGH"
+    },
+    {
+      "FixedVersion": "2.8.0",
+      "InstalledVersion": "2.7.0",
+      "PkgName": "urllib3",
+      "VulnerabilityID": "CVE-2026-97689",
+      "severity": "HIGH"
+    }
+  ],
+  "image_config_digest": "sha256:ba7ab0a820f4edbe43762cfad115ee78524e4fafd0dff419a541c1adf9986db5",
+  "missing_reviewed_secret_controls": 0,
+  "qualification_granted": false,
+  "report_sha256": {
+    "sbom.json": "e2c61aeeba9bdc2cc6d044ed74a28b4ff2b9929d677153591675c4b19433e6fa",
+    "secrets.json": "6f7ba295a45afd82acfcf79948e389f674226c2a2dd4f6804a97f2b228773c78",
+    "vulnerabilities.json": "792198c7b52b0c046b6d5276bde53f21f4f686e3c9ddc91f7ce1a26ae4c45b13"
+  },
+  "sbom_component_count": 79687,
+  "schema": "musemind.ragflow-candidate-scan-summary/v1",
+  "secret_matches": [
+    {
+      "match_sha256": "4f79a51946699d94d5125cd7499405c3e272a6739df0772cbb4d359c28fa016c",
+      "reviewed": true
+    },
+    {
+      "match_sha256": "5dc0b7dd9a63df3e935b5a21011d362c9372120e024ea2f755d2637d4595eb8d",
+      "reviewed": true
+    },
+    {
+      "match_sha256": "7bcf93aa8249d685a982d869a6ac9a0ecec189dc91295a8baab7749582d30e3e",
+      "reviewed": true
+    }
+  ],
+  "source_commit": "5c8af590037b9072e12ce9f8e5f103a1706f7735",
+  "unreviewed_high_count": 16,
+  "unreviewed_secret_count": 0,
+  "vulnerability_counts": {
+    "CRITICAL": 2,
+    "HIGH": 17,
+    "LOW": 75,
+    "MEDIUM": 104,
+    "UNKNOWN": 0
+  }
+}

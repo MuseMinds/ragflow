@@ -1,0 +1,44 @@
+{
+  "schema": "musemind.mmd541-lock-comparison/v1",
+  "versions_changed": [
+    {
+      "name": "anyio",
+      "before": "4.12.1",
+      "after": "4.14.2"
+    },
+    {
+      "name": "fsspec",
+      "before": "2026.1.0",
+      "after": "2026.6.0"
+    },
+    {
+      "name": "pyjwt",
+      "before": "2.13.0",
+      "after": "2.15.0"
+    },
+    {
+      "name": "pypdf",
+      "before": "6.15.0",
+      "after": "6.19.0"
+    },
+    {
+      "name": "urllib3",
+      "before": "2.7.0",
+      "after": "2.8.0"
+    }
+  ],
+  "package_entries": 651,
+  "unchanged_artifact_hashes_verified": 2550,
+  "missing_prior_artifacts": [],
+  "changed_existing_artifact_hashes": [],
+  "unexpected_dependency_graph_changes": [],
+  "registry_locator_changes": 647,
+  "resolution_markers_identical": true,
+  "old_lock_sha256": "e78913ec7b78463711ef8c33d970fa98ae334adc542e76b8f97c0199e3f774bb",
+  "new_lock_sha256": "e0ce5c627d1620abb4cb212181db53d7accecd67949536ec45749b496d6fcf22",
+  "baseline_source_commit": "5c8af590037b9072e12ce9f8e5f103a1706f7735",
+  "old_lock_git_blob_sha256": "74ba55db7a57011361f9f18ebc321441b712ee228ea06bd1d1eed1c20c50c7d0",
+  "old_lock_sha256_scope": "Windows CRLF checkout bytes; Git LF blob hash recorded separately",
+  "comparison_semantics": "TOML parsed package versions, dependency/optional/development edges, resolution markers and every artifact filename/hash; ignores only registry locator and newly supplied size metadata",
+  "new_lock_sha256_scope": "Complete uv 0.11.28 generated LF lock bytes"
+}
