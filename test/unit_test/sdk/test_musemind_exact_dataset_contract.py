@@ -66,6 +66,51 @@ def test_sdk_sends_generation_v2_exact_dataset_contract(monkeypatch):
     assert calls[0][1]["schema"] == "musemind.ragflow-dataset-create-or-adopt/v2"
 
 
+def _gemini_projection(weight=1.0):
+    return {
+        **_projection(),
+        "embd_id": "gemini-embedding-2@musemind@Gemini",
+        "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
+        "img2txt_id": "gemini-3.5-flash@musemind@Gemini",
+        "vector_similarity_weight": weight,
+    }
+
+
+def test_sdk_sends_explicit_generation_v3_contract_without_projection_rewrite(monkeypatch):
+    client = object.__new__(RAGFlow)
+    calls = []
+    projection = _gemini_projection()
+    response = SimpleNamespace(json=lambda: {"code": 0, "data": {"outcome": "CREATED", "dataset_id": DATASET_ID}})
+    monkeypatch.setattr(client, "post", lambda path, payload: calls.append((path, payload)) or response)
+
+    client.create_or_adopt_dataset_exact(DATASET_ID, projection, contract_schema="musemind.ragflow-dataset-create-or-adopt/v3")
+
+    assert calls == [("/datasets/musemind/exact", {"schema": "musemind.ragflow-dataset-create-or-adopt/v3", "dataset_id": DATASET_ID, "provider_projection": projection})]
+    assert calls[0][1]["provider_projection"] is projection
+
+
+@pytest.mark.parametrize(
+    ("schema", "projection"),
+    [
+        (None, _gemini_projection()),
+        ("musemind.ragflow-dataset-create-or-adopt/v2", _gemini_projection()),
+        ("musemind.ragflow-dataset-create-or-adopt/v3", _gemini_projection(0.3)),
+        ("musemind.ragflow-dataset-create-or-adopt/v3", _gemini_projection(True)),
+        ("musemind.ragflow-dataset-create-or-adopt/v3", _projection()),
+        ("musemind.ragflow-dataset-create-or-adopt/v1", _gemini_projection()),
+        ("musemind.ragflow-dataset-create-or-adopt/v99", _gemini_projection()),
+        ("musemind.ragflow-dataset-create-or-adopt/v3", {**_gemini_projection(), "unknown": True}),
+        ("musemind.ragflow-dataset-create-or-adopt/v3", {**_gemini_projection(), "pipeline_id": "0" * 32}),
+    ],
+)
+def test_sdk_rejects_cross_version_contract_before_http(monkeypatch, schema, projection):
+    client = object.__new__(RAGFlow)
+    monkeypatch.setattr(client, "post", lambda *_args, **_kwargs: pytest.fail("HTTP must not be called"))
+
+    with pytest.raises(ValueError):
+        client.create_or_adopt_dataset_exact(DATASET_ID, projection, contract_schema=schema)
+
+
 @pytest.mark.parametrize(
     ("dataset_id", "projection"),
     [

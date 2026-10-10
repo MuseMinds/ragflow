@@ -96,7 +96,7 @@ class RAGFlow:
             return DataSet(self, res["data"])
         raise Exception(res["message"])
 
-    def create_or_adopt_dataset_exact(self, dataset_id: str, provider_projection: dict[str, Any]) -> dict[str, Any]:
+    def create_or_adopt_dataset_exact(self, dataset_id: str, provider_projection: dict[str, Any], *, contract_schema: str | None = None) -> dict[str, Any]:
         """Create or adopt the exact MuseMind dataset identity."""
         if re.fullmatch(r"[0-9a-f]{32}", dataset_id) is None:
             raise ValueError("dataset_id must be 32 lowercase hexadecimal characters")
@@ -112,19 +112,29 @@ class RAGFlow:
         }
         required_v2 = required_v1 | {"llm_id", "img2txt_id"}
         fields = set(provider_projection)
-        if fields == required_v1:
-            contract_version = "v1"
-        elif fields == required_v2:
-            contract_version = "v2"
-        else:
+        if fields not in (required_v1, required_v2):
             raise ValueError("provider_projection must contain an exact supported field set")
+        if contract_schema is None:
+            contract_schema = "musemind.ragflow-dataset-create-or-adopt/v1" if fields == required_v1 else "musemind.ragflow-dataset-create-or-adopt/v2"
+        supported = {
+            "musemind.ragflow-dataset-create-or-adopt/v1": required_v1,
+            "musemind.ragflow-dataset-create-or-adopt/v2": required_v2,
+            "musemind.ragflow-dataset-create-or-adopt/v3": required_v2,
+        }
+        if not isinstance(contract_schema, str) or contract_schema not in supported or fields != supported[contract_schema]:
+            raise ValueError("provider_projection fields do not match the explicit contract schema")
+        if contract_schema != "musemind.ragflow-dataset-create-or-adopt/v1":
+            weight = provider_projection["vector_similarity_weight"]
+            expected_weight = 1.0 if contract_schema.endswith("/v3") else 0.3
+            if type(weight) not in (int, float) or weight != expected_weight:
+                raise ValueError("vector_similarity_weight does not match the contract schema")
         if provider_projection.get("pipeline_id") is not None:
             raise ValueError("pipeline_id must be null for the MuseMind pilot")
 
         response = self.post(
             "/datasets/musemind/exact",
             {
-                "schema": f"musemind.ragflow-dataset-create-or-adopt/{contract_version}",
+                "schema": contract_schema,
                 "dataset_id": dataset_id,
                 "provider_projection": provider_projection,
             },

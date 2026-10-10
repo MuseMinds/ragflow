@@ -1,0 +1,164 @@
+{
+  "schema": "musemind.mm-rf-0023.local-retrieval-summary/v1",
+  "status": "CANDIDATE_ONLY_PARTIAL",
+  "decision": "The minimal explicit-only synonym policy is deterministic in the recorded checks. It is blocked as a no-regression top10 replacement by one factual passage loss. The unchanged additive union recovers that passage in this sample, but has no Answer qualification and is not a deployed policy.",
+  "scope": "Local source and read-only cache-only diagnostic; no live source change, index mutation, commit, remote CI, build, deployment or production qualification.",
+  "source_receipt_all_pins_rechecked": true,
+  "protocol_all_local_input_truth_and_source_pins_rechecked": true,
+  "source_tests": 15,
+  "source_test_process_hash_seeds": [
+    "0",
+    "1",
+    "17",
+    "54101",
+    "random"
+  ],
+  "harness_boundary_tests": 7,
+  "source_and_harness_e9_f_lint": "PASS",
+  "git_diff_check": "PASS",
+  "previous_patches_mm21_mm22_preserved": true,
+  "case_counts": {
+    "query_wordings": 25,
+    "english_wordings": 11,
+    "topics": 24,
+    "english_topics": 10,
+    "independent_new_holdout": false
+  },
+  "execution": {
+    "successful_logical_queries": 100,
+    "captured_es_search_requests": 200,
+    "metadata_es_info_reads": 4,
+    "metadata_es_count_reads": 4,
+    "new_embeddings": 0,
+    "answer_calls": 0,
+    "preflight_failed_completed_queries": 0,
+    "failed_attempts_retained": [
+      "retrieval/baseline_54101/receipt.json",
+      "retrieval_02/baseline_54101/receipt.json"
+    ]
+  },
+  "arms": {
+    "baseline_54101": {
+      "queries": 25,
+      "receipt_sha256": "c335792b468cf145c3066695bfdb493273896b1fff69853be9bbed764c4a8fcc"
+    },
+    "curated_1": {
+      "queries": 25,
+      "receipt_sha256": "5f9b3e449da126fc1c099c856eb3efc1d767fabe58dde5a63e3b870ffa0fd0c9"
+    },
+    "curated_17": {
+      "queries": 25,
+      "receipt_sha256": "6c44dd65c582e13bb2fd54c92fe121c0c393cb386959513b39e68d36c4db0e61"
+    },
+    "curated_54101": {
+      "queries": 25,
+      "receipt_sha256": "a0d7116cf5eac26d0ea9371aeac909b96971422561adbd4638bd0a65536cc72a"
+    }
+  },
+  "candidate_three_seed_exact_agreement": {
+    "lexical_query_exact": 25,
+    "keywords_exact_order": 25,
+    "request_bodies_exact_serialized_order": 25,
+    "candidate_ids_exact_order": 25,
+    "candidate_scores_exact": 25,
+    "candidate_fields_exact": 25,
+    "ranked_exact_order_and_scores": 25,
+    "top10_exact": 25
+  },
+  "identity_changes_baseline_to_candidate": {
+    "top10_order_changed": 21,
+    "top10_set_changed": 13,
+    "top1_changed": 2,
+    "candidate_set_changed": 4
+  },
+  "shared_candidate_vector_score_drift": {
+    "cases": 25,
+    "maximum_absolute_difference": 0.0,
+    "all_shared_vector_scores_identical_cases": 25
+  },
+  "coverage_counts": {
+    "all": {
+      "baseline_54101": {
+        "top10": {
+          "PASS": 20,
+          "FAIL": 4,
+          "PARTIAL": 1
+        },
+        "union": {
+          "PASS": 24,
+          "FAIL": 1
+        }
+      },
+      "curated_54101": {
+        "top10": {
+          "PASS": 19,
+          "FAIL": 5,
+          "PARTIAL": 1
+        },
+        "union": {
+          "PASS": 24,
+          "FAIL": 1
+        }
+      }
+    },
+    "english": {
+      "baseline_54101": {
+        "top10": {
+          "PASS": 10,
+          "PARTIAL": 1
+        },
+        "union": {
+          "PASS": 11
+        }
+      },
+      "curated_54101": {
+        "top10": {
+          "PASS": 10,
+          "PARTIAL": 1
+        },
+        "union": {
+          "PASS": 11
+        }
+      }
+    }
+  },
+  "new_top10_factual_passage_regressions": 1,
+  "regression_ranks": [
+    {
+      "before": 10,
+      "after": 14,
+      "frozen_union_recovers": true
+    }
+  ],
+  "witness_audit": {
+    "strict_utf8_json_files": 110,
+    "replacement_character_files": [],
+    "witness_selection_occurrences_verified": 170,
+    "unique_case_arm_chunk_quote_witnesses": 98
+  },
+  "limitations": [
+    "25 previously observed query wordings represent 24 topics; hash seeds are repetitions, not independent quality cases.",
+    "The English subgroup has 11 wordings representing 10 topics; unchanged observed coverage does not prove general English synonym recall.",
+    "Unconfigured automatic English synonym recall is intentionally removed. Explicit curated mappings and their order are unchanged.",
+    "No language, sense, tokenizer, query scoring or reranking change; this is not complete polysemy disambiguation.",
+    "The exact effective dictionary remains a required input; its mutable Redis reload semantics have not changed.",
+    "The frozen additive selector is measured separately; no model generations or end-to-end app quality checks were performed.",
+    "Vector scores are exactly unchanged for shared candidates; this does not requalify the ancestry of previously cached embeddings.",
+    "The first two preflight execution attempts completed zero queries and their failed receipts are retained."
+  ],
+  "private_evidence_hashes_only": {
+    "protocol.json": "527fd5a09910626f691915b658a92173b2a07f4fb5e1c6179925339655ecce81",
+    "protocol_02.json": "68fcb8c8475701a25c33902b96bb88fbb73743fdffe3a84bd89e23dd9ef35f12",
+    "protocol_03.json": "6b03839153a17ba158ec1e3cf9a5f737429a3c7e662b10b05cca77d35e7b6f33",
+    "cases.json": "d8823aa1d4d77b5edc77f3527793cd890457bcabf2312b965279d28835f563ef",
+    "cache_inventory.json": "4b1aee7d0b42a6a9aa011a5949ac5ed0f1bf3c151feeb96ae8023f72b80e6e91",
+    "retrieval_comparison_01.json": "e51d5564a978582b2b1420965f574c369a4db037a8f15e98f7f6bd5543e70247",
+    "passage_review_01.json": "d0f26e135810c82b3006cd0edc05dfada321525ee7a47a1e1d20d7c1b73105fc",
+    "witness_audit_01.json": "81ca5674478f82b359b9362e0371505267ce6f49e59421a1388976d21fac2bcd",
+    "harness-unit-validation-01.log": "e73cbafe74aa7956b6341f1d37bf99c3c59b42d59b21175af4749f5864455680",
+    "source-validation-01.json": "72304b32b8a991992f15324153c7358282f4bb0bc52ffc7dfc50068ed91e4dde",
+    "eval_mmd541_lexical.py": "ef841b7f7071af1f7ce646fc0cb5f5008e3d5db1d7b8aafa7293bfdaa9750765",
+    "test_eval_mmd541_lexical.py": "ffb3c718ef976ce7f0a397a29f182f7ea477f4ed2757312e91bf523c526e7801"
+  },
+  "privacy": "No museum text, query text, source excerpts, provider coordinates, credentials or vectors are included in this receipt."
+}

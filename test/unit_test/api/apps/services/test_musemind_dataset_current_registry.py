@@ -15,10 +15,11 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from peewee import IntegrityError
 
 from api.db.musemind_provider_identity import reconcile_provider_identity
-from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV2
+from api.utils.musemind_provider_contract import MuseMindDatasetCreateOrAdoptV2, MuseMindDatasetCreateOrAdoptV3
 from common.constants import LLMType
 from test.unit_test.api.db.test_musemind_provider_identity import MemoryStore, make_spec
 
@@ -41,6 +42,7 @@ def _stub(monkeypatch, name, **attrs):
 
 def _request():
     return {
+        "schema": "musemind.ragflow-dataset-create-or-adopt/v1",
         "dataset_id": DATASET_ID,
         "provider_projection": {
             "language": "Italian",
@@ -55,12 +57,13 @@ def _request():
     }
 
 
-def _request_v2():
+def _request_gemini(version):
     request = _request()
     request["provider_projection"].update(
         embd_id="gemini-embedding-2@musemind@Gemini",
         llm_id="gemini-3.1-flash-lite@musemind@Gemini",
         img2txt_id="gemini-3.5-flash@musemind@Gemini",
+        vector_similarity_weight=1.0 if version == 3 else 0.3,
         parser_config={
             "chunk_token_num": 512,
             "llm_id": "gemini-3.1-flash-lite@musemind@Gemini",
@@ -69,14 +72,13 @@ def _request_v2():
             "overlapped_percent": 0,
         },
     )
-    request["schema"] = "musemind.ragflow-dataset-create-or-adopt/v2"
-    return MuseMindDatasetCreateOrAdoptV2(**request).model_dump(by_alias=True)
+    request["schema"] = f"musemind.ragflow-dataset-create-or-adopt/v{version}"
+    model_type = MuseMindDatasetCreateOrAdoptV3 if version == 3 else MuseMindDatasetCreateOrAdoptV2
+    return model_type(**request).model_dump(by_alias=True)
 
 
 def _load_service(monkeypatch, *, resolver, save, tenant=None, expected_tenant_id="tenant-1"):
-    tenant = tenant or SimpleNamespace(
-        embd_id=EMBEDDING_ID, tenant_embd_id=None, llm_id="chat-model"
-    )
+    tenant = tenant or SimpleNamespace(embd_id=EMBEDDING_ID, tenant_embd_id=None, llm_id="chat-model")
     saved = {}
 
     def persist(**payload):
@@ -216,7 +218,8 @@ def test_reconciled_one_shot_state_allows_exact_route_with_null_legacy_field(mon
     assert saved["tenant_embd_id"] is None
 
 
-def test_generation_v2_validates_three_registry_rows_and_exact_readback(monkeypatch):
+@pytest.mark.parametrize("version", [2, 3])
+def test_gemini_generation_validates_three_registry_rows_and_exact_readback(monkeypatch, version):
     tenant = SimpleNamespace(
         embd_id="gemini-embedding-2@musemind@Gemini",
         tenant_embd_id=None,
@@ -226,10 +229,11 @@ def test_generation_v2_validates_three_registry_rows_and_exact_readback(monkeypa
     resolver = MagicMock(return_value={"llm_factory": "Gemini"})
     module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1, tenant=tenant)
 
-    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_v2())
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_gemini(version))
 
     assert success is True
-    assert result["provider_projection"]["schema"] == "musemind.ragflow-dataset-provider-projection/v2"
+    assert result["provider_projection"]["schema"] == f"musemind.ragflow-dataset-provider-projection/v{version}"
+    assert result["provider_projection"]["vector_similarity_weight"] == (1.0 if version == 3 else 0.3)
     assert result["provider_projection"]["llm_id"] == tenant.llm_id
     assert result["provider_projection"]["img2txt_id"] == tenant.img2txt_id
     assert saved["parser_config"]["table_context_size"] == 0
@@ -237,7 +241,8 @@ def test_generation_v2_validates_three_registry_rows_and_exact_readback(monkeypa
     assert [call.args[1] for call in resolver.call_args_list] == [LLMType.EMBEDDING, LLMType.CHAT, LLMType.IMAGE2TEXT]
 
 
-def test_generation_v2_uses_registry_rows_when_tenant_defaults_differ(monkeypatch):
+@pytest.mark.parametrize("version", [2, 3])
+def test_gemini_generation_uses_registry_rows_when_tenant_defaults_differ(monkeypatch, version):
     tenant = SimpleNamespace(
         embd_id="legacy-default@other@Jina",
         tenant_embd_id=None,
@@ -247,11 +252,56 @@ def test_generation_v2_uses_registry_rows_when_tenant_defaults_differ(monkeypatc
     resolver = MagicMock(return_value={"llm_factory": "Gemini"})
     module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1, tenant=tenant)
 
-    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_v2())
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_gemini(version))
 
-    projection = _request_v2()["provider_projection"]
+    projection = _request_gemini(version)["provider_projection"]
     assert success is True
     assert result["outcome"] == "CREATED"
     assert saved["embd_id"] == projection["embd_id"]
     assert saved["parser_config"]["llm_id"] == projection["llm_id"]
     assert saved["parser_config"]["img2txt_id"] == projection["img2txt_id"]
+
+
+@pytest.mark.parametrize("version", [2, 3])
+@pytest.mark.parametrize("missing_type", [LLMType.EMBEDDING, LLMType.CHAT, LLMType.IMAGE2TEXT])
+def test_gemini_generation_missing_registry_row_rejects_before_insert(monkeypatch, version, missing_type):
+    def resolve(_tenant_id, model_type, _model_name):
+        if model_type == missing_type:
+            raise ValueError("missing")
+        return {"llm_factory": "Gemini"}
+
+    module, saved = _load_service(monkeypatch, resolver=resolve, save=lambda _payload: pytest.fail("insert must not run"))
+    assert module.create_or_adopt_musemind_dataset("tenant-1", _request_gemini(version)) == (False, "PROVIDER_DATASET_CONFIG_INVALID")
+    assert not saved
+
+
+def test_unknown_contract_rejects_before_registry_or_insert(monkeypatch):
+    resolver = MagicMock(side_effect=AssertionError("registry must not run"))
+    module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: pytest.fail("insert must not run"))
+    request = _request()
+    request["schema"] = "musemind.ragflow-dataset-create-or-adopt/v99"
+    assert module.create_or_adopt_musemind_dataset("tenant-1", request) == (False, "PROVIDER_DATASET_CONFIG_INVALID")
+    resolver.assert_not_called()
+    assert not saved
+
+
+@pytest.mark.parametrize(("existing_version", "requested_version"), [(2, 2), (3, 3), (2, 3), (3, 2)])
+def test_gemini_adoption_requires_exact_generation_projection(monkeypatch, existing_version, requested_version):
+    resolver = MagicMock(return_value={"llm_factory": "Gemini"})
+    module, saved = _load_service(monkeypatch, resolver=resolver, save=lambda _payload: 1)
+    assert module.create_or_adopt_musemind_dataset("tenant-1", _request_gemini(existing_version))[0] is True
+    original = dict(saved)
+
+    def duplicate(**_payload):
+        raise IntegrityError(1062, "Duplicate entry 'id' for key 'PRIMARY'")
+
+    module.KnowledgebaseService.save = duplicate
+    success, result = module.create_or_adopt_musemind_dataset("tenant-1", _request_gemini(requested_version))
+
+    if existing_version == requested_version:
+        assert success is True
+        assert result["outcome"] == "ADOPTED"
+        assert result["provider_projection"]["schema"] == f"musemind.ragflow-dataset-provider-projection/v{requested_version}"
+    else:
+        assert (success, result) == (False, "PROVIDER_DATASET_IDENTITY_COLLISION")
+    assert saved == original

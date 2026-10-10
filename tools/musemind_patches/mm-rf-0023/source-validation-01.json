@@ -1,0 +1,50 @@
+{
+  "schema": "musemind.mm-rf-0023.source-validation/v1",
+  "base_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+  "source_tests": 15,
+  "process_hash_seeds": [
+    "0",
+    "1",
+    "17",
+    "54101",
+    "random"
+  ],
+  "harness_boundary_tests": 7,
+  "results": [
+    {
+      "label": "source-unit",
+      "exit_code": 0,
+      "log": "source-unit-validation-01.log",
+      "log_sha256": "5e0324cd589450331e2d524c47f081b55ef7ded9efb79d2856295414b0129f87"
+    },
+    {
+      "label": "harness-unit",
+      "exit_code": 0,
+      "log": "harness-unit-validation-01.log",
+      "log_sha256": "e73cbafe74aa7956b6341f1d37bf99c3c59b42d59b21175af4749f5864455680"
+    },
+    {
+      "label": "source-lint",
+      "exit_code": 0,
+      "log": "source-lint-validation-01.log",
+      "log_sha256": "a4443afdcfb6d7363adb285762515ccf7cf50473b1a05c20c1a50f6bed4d26b0"
+    }
+  ],
+  "files": {
+    "rag/nlp/synonym.py": "48483362f7b9ad6f7679d6647a2ab1f643480ba2323c54e670a204cf82267d1d",
+    "rag/nlp/query.py": "6a2b6f41a1b303e0ecd12927ace592bbb278d7891d689fe96a7b298ced0ebcc9",
+    "rag/nlp/term_weight.py": "1a3a91dd0ac496a9bb35b0ca5c11868100a34ecdb3e5949a1024c8ae79928f7c",
+    "rag/nlp/rag_tokenizer.py": "21f42502781fbf135533ab20b90870063170a71dad24321d7f400fc6021268cd",
+    "rag/res/synonym.json": "52b529b66adeeb81915b5bcf1fca30bbc136480c9ddecd05988a2a5ad4c15582",
+    "rag/app/naive.py": "1e72aa8a78a9187184733c41754a084f92df4ba5c25502b8ed5c1b232f9f27a3",
+    "rag/utils/es_conn.py": "cbdac16359ab3c5b3f787db257f1f8d5e976c89612b09acc083e45b0e99881ff",
+    "rag/nlp/search.py": "69083ca816611a9ba5c314e4843b67e1a39321b86199880359827da4b64b7499",
+    "test/unit_test/rag/nlp/test_curated_synonyms.py": "ea05158ba6876412d9494777aa11bce700e9347b47c48705fc56aa78dc9600f5",
+    ".github/workflows/musemind-provider-contract.yml": "a16a0262e9beb0e29123db42f8ed3cf977d71c9c4114826d29bcc21104afd46a",
+    "MUSEMIND_PATCHES.md": "428d41fed323ea17d4393e80ee40e7233e3cce46223a72bfcc11df997142628a",
+    "tools/musemind_patches/mm-rf-0023/README.md": "8f137c9dd179c1318d79e52603ffa398baad76b1c1c8587d23f4542974a20dc1"
+  },
+  "scope": "Local uncommitted source candidate; no remote CI/build/deploy or production qualification",
+  "previous_patches_preserved": true,
+  "models_called": 0
+}

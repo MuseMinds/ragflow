@@ -562,6 +562,153 @@ test does not by itself qualify a runtime bundle.
   A fresh immutable build, scans/disposition and impacted C04/C05/C09 qualification are required
   before deployment. Source regression success is not a live cancellation qualification PASS.
 
+## MM-RF-0021 — Independent scoped Elasticsearch hybrid candidates
+
+- Reason: `ESConnection.search` serialized the evolving text/scoring bool query into the kNN
+  pre-filter. With the normal text-then-vector expression order, a semantic candidate also had to
+  satisfy the lexical query. Changing query wording can mask this loss; it cannot restore the
+  independent vector candidate channel at the integration boundary.
+- Change: snapshot only the existing condition-derived scope and eligibility clauses before
+  processing match expressions. Use that snapshot for kNN and retain the text query as the other
+  Elasticsearch retrieval leg. Dataset/document filters, chunk-ID alternatives, availability and
+  exclusions survive in both legs. The exact route's pair membership pre-check and whole-result
+  provenance post-check remain unchanged, including rejection of cross-Cartesian pairs.
+- Files: `rag/utils/es_conn.py`; regressions
+  `test/unit_test/rag/utils/test_es_hybrid_candidates.py` and
+  `test/unit_test/rag/utils/test_es_exact_scope_provenance.py`.
+- Validation: actual source method bodies with the locked Elasticsearch DSL; no/weak lexical
+  match, expression ordering, filter and eligibility negatives, chunk-ID second pass, unchanged
+  text-only search and scoring parameters; actual exact route with cross-pair, foreign-scope,
+  missing-provenance and expansion negatives. The source test evaluator does not claim to simulate
+  Elasticsearch ranking. Local evidence and the dependency-scoped impact manifest live in
+  [`tools/musemind_patches/mm-rf-0021/`](tools/musemind_patches/mm-rf-0021/).
+- Scope: no client/endpoint/schema, scope authority, embedding, similarity weight/normalization,
+  retry/fallback, dependency, registry or frozen bundle change. No museum-specific query rule or
+  extra retrieval call. Source changes are local and uncommitted; no running provider was patched.
+- Qualification: candidate selection is output-affecting and requires a new immutable generation
+  and museum-owned dataset materialization before promotion. Application C-01, generation
+  JCS/readback, impacted C-02/C-03/C-08/C-09 and retrieval quality must be rerun on the exact bundle;
+  carry-forward requires unchanged dependency evidence. The frozen release candidate still needs
+  the canonical full C-01–C-09 matrix. Local unit success is not qualification or deployment.
+
+## MM-RF-0022 — Keep plain Markdown headings with their following body
+
+- Base: upstream `v0.26.4` (`cb93883f3f8c975eecb2fed81210effeb3bdb06f`), local fork branch
+  `mm/mmd541-retrieval-candidates` at `9666c8a2db08b006c2bd31863708f615f911e63f`.
+  The frozen parser comparison uses `19ca2faf6`; this patch does not update dependencies/upstream.
+- Reason: the Markdown-specific packing loop could append a heading to a nearly full chunk,
+  then place its following body in the next chunk. The previous short-header heuristic only
+  examined the whole current chunk. This is not the generic `rag.nlp.naive_merge` path.
+- Change: retain the default extractor's existing ATX heading levels for eligible plain Markdown.
+  Group an original heading (or descending heading hierarchy) with its next original body element
+  before packing. Preserve source order, the newline-joined extracted element stream and the
+  existing per-element token counter. Do not invent headings, repeat text or propagate bibliographies.
+  Empty sibling/ancestor/final headings do not acquire an invented body. Indivisible groups may
+  exceed the configured token target; no truncation or hard-cap claim is introduced.
+- Files: `rag/app/naive.py`; regression
+  `test/unit_test/rag/app/test_markdown_heading_boundaries.py`; explicit source compile/lint/test
+  wiring in `.github/workflows/musemind-provider-contract.yml`; content-free source evidence in
+  [`tools/musemind_patches/mm-rf-0022/`](tools/musemind_patches/mm-rf-0022/).
+- Bounds: retain the prior path for images (including reference syntax), tables, raw HTML, front
+  matter, custom delimiters, nonpositive budgets and nonzero overlap. Setext and indented headings
+  retain the upstream text-block interpretation. No change to source bytes, parser parameters,
+  generation schema, provider identity, exact scope or one-source-revision/one-provider-document
+  cardinality. No source-specific rule or model call is added.
+- Validation: actual parser/packing source AST, synthetic boundary cases and existing Markdown
+  regressions; exact frozen-source comparisons for excluded paths. Protected source CI explicitly
+  runs the new dependency-light unittest file; no remote CI was dispatched. A separate private offline
+  corpus replay checks all source-ordered elements with the real local tokenizer; only aggregate
+  counts and receipt hashes are retained here. It is not ingestion/retrieval/answer qualification.
+- Qualification: output-affecting chunk boundaries require a new immutable parser bundle and
+  generation plus fresh museum-owned materializations. Application C-01, generation readback,
+  impacted ingestion C-04, identity C-08, rebuild C-09 and retrieval C-02/C-03/quality gates must
+  be rerun on that exact bundle; frozen-release qualification still requires the canonical matrix.
+  Existing generations, indices and running providers remain unchanged. This entry records a local,
+  uncommitted source candidate, not a qualified build or deployment.
+
+## MM-RF-0023 — Expand only explicit lexical dictionary entries
+
+- Base: upstream `v0.26.4` (`cb93883f3f8c975eecb2fed81210effeb3bdb06f`), local fork branch
+  `mm/mmd541-retrieval-candidates` at `9666c8a2db08b006c2bd31863708f615f911e63f`.
+  MM-RF-0021 and MM-RF-0022 remain intact; no upstream/dependency update is included.
+- Reason: synonym lookup has no language, part-of-speech or sense context. Its English WordNet
+  fallback applied to all lowercase ASCII words, including non-English homographs and tokenized
+  forms. Selecting the first eight synset names from a set also changed terms and their order
+  between Python hash seeds. Sorting that set would not repair the semantic ambiguity.
+- Change: remove automatic WordNet lookup and its eager corpus load from `rag/nlp/synonym.py`.
+  Expand only configured dictionary entries, retaining their exact values, authored list order,
+  duplicates, limit behavior and existing file/Redis loading behavior. The lookup signature,
+  `query.py`, original query terms, adjacent phrases, scoring, weights and exact scope are unchanged.
+- Tradeoff: unconfigured English synonyms no longer provide automatic lexical recall. This is
+  an explicit conservative choice, not language detection, contextual disambiguation or a claim
+  of equal recall. Explicit dictionaries still require appropriate authoring; live Redis dictionary
+  updates and existing tokenizer language behavior remain separate reproducibility concerns.
+- Validation: dependency-light actual-source tests exercise multilingual homographs, English
+  recall tradeoffs, curated ordering, query construction and adjacent-term scoring across fresh
+  processes/hash seeds. Source CI explicitly runs the regression. Private local retrieval uses
+  frozen cached vectors and the same physical index; only aggregate evidence belongs in
+  [`tools/musemind_patches/mm-rf-0023/`](tools/musemind_patches/mm-rf-0023/).
+- Qualification: this output-affecting retrieval change requires a new immutable bundle/generation
+  and the applicable canonical build, exact-scope, provenance and retrieval-quality qualification
+  before promotion. Local tests and read-only diagnostic processes do not qualify or mutate a
+  deployed provider, dataset, generation or index. No remote CI, publication or deployment is implied.
+
+## Patch MM-RF-0024 — explicit generation-v3 dataset transport
+
+- Purpose: transport the accepted semantic-weight `1.0` successor without broadening or
+  reinterpreting generation-v2's `0.3` projection. This patch supplies protocol compatibility;
+  it is not an independent retrieval-quality experiment.
+- Contract: the existing private `/datasets/musemind/exact` route accepts the new explicit
+  `musemind.ragflow-dataset-create-or-adopt/v3` DTO and returns
+  `musemind.ragflow-dataset-provider-projection/v3`. Models, parser configuration, threshold,
+  pagerank, identity/tenant checks and exact readback remain pinned as in v2; only the final
+  semantic weight differs. Existing v1/v2 DTOs retain their previous accepted values.
+- SDK: `create_or_adopt_dataset_exact(..., contract_schema=...)` selects v3 explicitly. Omitting
+  the keyword keeps existing v1/v2 field-set selection and never infers v3 from a weight. Unknown
+  schemas, incompatible field sets or v2/v3 weight mismatches fail before HTTP.
+- Service: the validated request schema selects the response schema; all three Gemini model
+  registrations are checked before insert and normalized readback includes the pinned model IDs
+  for both v2 and v3. Exact-ID collision/adoption semantics remain unchanged.
+- Validation: DTO cross-version rejection, SDK zero-HTTP rejection, exact service readback and
+  each missing model registration are covered by source tests in required CI. A new SDK wheel,
+  immutable provider image and generation must be qualified together; local tests are not live
+  qualification. No model/bootstrap adapter or upstream dependency changes are included.
+- Qualification/rollback: repeat C-01, strict dataset create/adopt, tenant/collision/concurrency,
+  clean rebuild and retrieval/provenance gates affected by this transport, then the full frozen
+  C-01–C-09 matrix before first publish. Roll back the complete prior qualified generation and
+  bindings; do not send a v3 projection under the old v2 identity.
+
+## MM-RF-0021–0023 consolidation scope (2026-10-10)
+
+The adopted source package combines MM-RF-0021 semantic eligibility, MM-RF-0022 Markdown
+heading/body packing and MM-RF-0023 curated-only synonyms with the application-owned successor
+generation's final semantic weight `1.0` and top ten results. The three runtime files retain the
+exact locally exercised bytes. This does not change the embedding adapter, tokenizer, semantic
+candidate pool, query construction or model. The weight is not hardcoded into the provider search.
+
+MM-RF-0023 is **not** adopted as a standalone no-regression change: the preserved
+[`local-retrieval-summary-01.json`](tools/musemind_patches/mm-rf-0023/local-retrieval-summary-01.json)
+records a factual passage loss at the previous final weight. Later private, frozen multilingual
+and guided-visit comparisons support the combined candidate, not a separate attribution of each
+patch's quality. They do not qualify an immutable deployable bundle.
+
+The source receipts and failed experiments under `tools/musemind_patches/mm-rf-0021` through
+`mm-rf-0023` remain historical records of their exact runs. Their branch names, no-commit/no-deploy
+statements and then-current qualification statuses are not the present consolidation status.
+Private questions, answers, source documents, passages and vectors remain outside this repository.
+
+Required CI explicitly compiles/lints all three runtime paths and runs all four new test files,
+including both Elasticsearch semantic-candidate and exact-scope provenance regressions that were
+missing from the experimental workflow. The parser/synonym tests use actual source with isolated
+dependencies; the bounded Elasticsearch predicate fixture does not simulate ranking.
+
+Before promotion: freeze the exact new fork/image/SDK/config and generation identities, complete
+the canonical C-01–C-09 matrix on that bundle, verify exact scope and provenance, re-materialize
+the sources with the new parser, and run the application retrieval/visit readback. The old
+generation remains immutable; neither a unit-test pass nor the private visit substitutes for
+these gates. New source revisions and application generation/binding contracts belong to their
+own repositories, not to this provider ledger.
+
 ## Qualification status
 
 | Evidence | Status |

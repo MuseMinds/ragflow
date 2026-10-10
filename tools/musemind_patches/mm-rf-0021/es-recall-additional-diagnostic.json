@@ -1,0 +1,106 @@
+{
+  "schema": "musemind.mm-rf-0021-local-es-additional-diagnostic/v1",
+  "status": "COMPLETED_READ_ONLY_NOT_QUALIFICATION",
+  "captured_at": "2026-10-09",
+  "source": {
+    "active_version": "19ca2fa",
+    "local_base_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+    "es_full_ast_equal_to_local_base": true,
+    "es_search_equal_to_local_base": true,
+    "active_es_sha256": "0df42501cc90603521c499672f1ed9e6f99a1255bf557e5ff7d79fcd12de84ad",
+    "active_search_sha256": "feb9cb94aeef45d29f2273af981a1b305614080f3ac8dc0c48364fce19c265be",
+    "patched_es_sha256": "a265e264d8c4378ad8024352692f383078fb4979c6168287266f9ad2ceb5a1f0"
+  },
+  "scope_manifest_sha256": "581f827498d540d20aa14c45d82ce0bf69f162d07414cbcf37582c9ab2dbd20c",
+  "scope_note": "Separate local 188-pair manifest; not the scope used for the initial three cases",
+  "scope_pairs": 188,
+  "dataset_count": 3,
+  "exact_pair_membership_verified_by_read_only_sql": true,
+  "same_vectors_before_after": true,
+  "new_embedding_query_count": 1,
+  "cumulative_authorized_embedding_query_count": 4,
+  "answer_generation_count": 0,
+  "running_provider_mutations": false,
+  "new_generation_activated": false,
+  "content_free": true,
+  "case": {
+    "case_id": "M-DE:4",
+    "before": {
+      "candidate_count": 70,
+      "reference_document_ranks": [
+        12,
+        13,
+        15,
+        18
+      ]
+    },
+    "after": {
+      "candidate_count": 70,
+      "reference_document_ranks": [
+        12,
+        13,
+        15,
+        18
+      ]
+    },
+    "offline_ablation": [
+      {
+        "weight": 0.3,
+        "reference_document_ranks": [
+          12,
+          13,
+          15,
+          18
+        ],
+        "policy": {
+          "vector_similarity_weight": 0.3,
+          "runtime_v2_weight_compatible": true,
+          "qualification_status": "PENDING_NEW_IMMUTABLE_BUNDLE"
+        }
+      },
+      {
+        "weight": 0.5,
+        "reference_document_ranks": [
+          3,
+          5,
+          6,
+          12
+        ],
+        "policy": {
+          "vector_similarity_weight": 0.5,
+          "runtime_v2_weight_compatible": false,
+          "qualification_status": "INCOMPATIBLE_WITH_V2_DIAGNOSTIC_ONLY"
+        }
+      },
+      {
+        "weight": 0.7,
+        "reference_document_ranks": [
+          1,
+          2,
+          5,
+          7
+        ],
+        "policy": {
+          "vector_similarity_weight": 0.7,
+          "runtime_v2_weight_compatible": false,
+          "qualification_status": "INCOMPATIBLE_WITH_V2_DIAGNOSTIC_ONLY"
+        }
+      },
+      {
+        "weight": 1.0,
+        "reference_document_ranks": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "policy": {
+          "vector_similarity_weight": 1.0,
+          "runtime_v2_weight_compatible": false,
+          "qualification_status": "INCOMPATIBLE_WITH_V2_DIAGNOSTIC_ONLY"
+        }
+      }
+    ]
+  },
+  "ranking_recommendation": "DO_NOT_ADOPT_0_7: selected cases are insufficient; independent general holdout required; generation-v2 remains pinned to 0.3"
+}

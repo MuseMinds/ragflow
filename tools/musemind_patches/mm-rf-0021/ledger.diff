@@ -1,0 +1,40 @@
+diff --git a/MUSEMIND_PATCHES.md b/MUSEMIND_PATCHES.md
+index 40bc0816a..3d762d8f0 100644
+--- a/MUSEMIND_PATCHES.md
++++ b/MUSEMIND_PATCHES.md
+@@ -562,6 +562,35 @@ test does not by itself qualify a runtime bundle.
+   A fresh immutable build, scans/disposition and impacted C04/C05/C09 qualification are required
+   before deployment. Source regression success is not a live cancellation qualification PASS.
+ 
++## MM-RF-0021 — Independent scoped Elasticsearch hybrid candidates
++
++- Reason: `ESConnection.search` serialized the evolving text/scoring bool query into the kNN
++  pre-filter. With the normal text-then-vector expression order, a semantic candidate also had to
++  satisfy the lexical query. Changing query wording can mask this loss; it cannot restore the
++  independent vector candidate channel at the integration boundary.
++- Change: snapshot only the existing condition-derived scope and eligibility clauses before
++  processing match expressions. Use that snapshot for kNN and retain the text query as the other
++  Elasticsearch retrieval leg. Dataset/document filters, chunk-ID alternatives, availability and
++  exclusions survive in both legs. The exact route's pair membership pre-check and whole-result
++  provenance post-check remain unchanged, including rejection of cross-Cartesian pairs.
++- Files: `rag/utils/es_conn.py`; regressions
++  `test/unit_test/rag/utils/test_es_hybrid_candidates.py` and
++  `test/unit_test/rag/utils/test_es_exact_scope_provenance.py`.
++- Validation: actual source method bodies with the locked Elasticsearch DSL; no/weak lexical
++  match, expression ordering, filter and eligibility negatives, chunk-ID second pass, unchanged
++  text-only search and scoring parameters; actual exact route with cross-pair, foreign-scope,
++  missing-provenance and expansion negatives. The source test evaluator does not claim to simulate
++  Elasticsearch ranking. Local evidence and the dependency-scoped impact manifest live in
++  [`tools/musemind_patches/mm-rf-0021/`](tools/musemind_patches/mm-rf-0021/).
++- Scope: no client/endpoint/schema, scope authority, embedding, similarity weight/normalization,
++  retry/fallback, dependency, registry or frozen bundle change. No museum-specific query rule or
++  extra retrieval call. Source changes are local and uncommitted; no running provider was patched.
++- Qualification: candidate selection is output-affecting and requires a new immutable generation
++  and museum-owned dataset materialization before promotion. Application C-01, generation
++  JCS/readback, impacted C-02/C-03/C-08/C-09 and retrieval quality must be rerun on the exact bundle;
++  carry-forward requires unchanged dependency evidence. The frozen release candidate still needs
++  the canonical full C-01–C-09 matrix. Local unit success is not qualification or deployment.
++
+ ## Qualification status
+ 
+ | Evidence | Status |

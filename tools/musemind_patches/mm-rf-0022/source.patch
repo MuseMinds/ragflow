@@ -1,0 +1,299 @@
+diff --git a/rag/app/naive.py b/rag/app/naive.py
+index 274c089d8..aece7834c 100644
+--- a/rag/app/naive.py
++++ b/rag/app/naive.py
+@@ -85,6 +85,25 @@ def _is_short_header(text, max_tokens=50):
+     return num_tokens_from_string(text) < max_tokens
+ 
+ 
++def _markdown_section_groups(heading_levels):
++    """Keep original ATX headings and their next body element indivisible.
++
++    Levels come from the default Markdown extractor: positive for headers, zero
++    for body, negative for a standalone thematic break. Only descending heading
++    hierarchies attach; empty sibling/ancestor headings never acquire a body.
++    """
++    index = 0
++    while index < len(heading_levels):
++        end = index + 1
++        if heading_levels[index] > 0:
++            while end < len(heading_levels) and heading_levels[end] > heading_levels[end - 1]:
++                end += 1
++            if end < len(heading_levels) and heading_levels[end] == 0:
++                end += 1
++        yield range(index, end)
++        index = end
++
++
+ def _normalize_section_text_for_rtl_presentation_forms(sections):
+     if not sections:
+         return sections
+@@ -857,6 +876,23 @@ class Markdown(MarkdownParser):
+         image_refs = self.extract_image_urls_with_lines(parsing_text)
+         element_sections = extractor.extract_elements(delimiter, include_meta=True)
+ 
++        # Preserve existing media/custom-delimiter/front-matter handling. Header
++        # metadata is reliable here only for the default plain-Markdown path.
++        self.heading_levels = None
++        if (
++            separate_tables
++            and not tables
++            and not image_refs
++            and "![" not in parsing_text
++            and not (delimiter and extractor.get_delimiters(delimiter))
++            and not re.search(r"<[A-Za-z/!?]", parsing_text)
++            and not re.match(r"\s*(?:\ufeff)?---(?:\r?\n|$)", txt)
++        ):
++            self.heading_levels = [
++                len(element["content"]) - len(element["content"].lstrip("#")) if element["type"] == "header" else -1 if element["content"].strip() in {"---", "***", "___"} else 0
++                for element in element_sections
++            ]
++
+         sections = []
+         section_images = []
+         image_cache = {}
+@@ -1182,18 +1218,22 @@ def chunk(filename, binary=None, from_page=0, to_page=MAXIMUM_PAGE_NUMBER, lang=
+         merged_chunks = []
+         merged_images = []
+         chunk_limit = max(0, int(parser_config.get("chunk_token_num", 128)))
++        keep_headers = markdown_parser.heading_levels is not None and chunk_limit > 0 and overlapped_percent == 0
++        section_groups = _markdown_section_groups(markdown_parser.heading_levels) if keep_headers else ((idx,) for idx in range(len(sections)))
+ 
+         current_text = ""
+         current_tokens = 0
+         current_image = None
+ 
+-        for idx, sec in enumerate(sections):
+-            text = sec[0] if isinstance(sec, tuple) else sec
+-            sec_tokens = num_tokens_from_string(text)
+-            sec_image = section_images[idx] if section_images and idx < len(section_images) else None
++        for group in section_groups:
++            texts = [sections[idx][0] if isinstance(sections[idx], tuple) else sections[idx] for idx in group]
++            text = "\n".join(texts)
++            sec_tokens = sum(num_tokens_from_string(part) for part in texts)
++            sec_image = section_images[group[0]] if section_images and group[0] < len(section_images) else None
+ 
+-            # Don't finalize chunk if current_text is a short header (force merge with next section)
+-            if current_text and not _is_short_header(current_text) and current_tokens + sec_tokens > chunk_limit:
++            # Plain Markdown groups already include the body, even for long
++            # headings. Preserve the legacy short-header rule on other paths.
++            if current_text and (keep_headers or not _is_short_header(current_text)) and current_tokens + sec_tokens > chunk_limit:
+                 merged_chunks.append(current_text)
+                 merged_images.append(current_image)
+                 overlap_part = ""
+diff --git a/test/unit_test/rag/app/test_markdown_heading_boundaries.py b/test/unit_test/rag/app/test_markdown_heading_boundaries.py
+new file mode 100644
+index 000000000..55fcae325
+--- /dev/null
++++ b/test/unit_test/rag/app/test_markdown_heading_boundaries.py
+@@ -0,0 +1,210 @@
++"""Execute the actual Markdown extractor and packing AST without app/model startup.
++
++Synthetic text only. Image loading and table rendering are boundary doubles;
++neither is changed by MM-RF-0022. Token counts are deterministic word counts.
++"""
++
++import ast
++import logging
++import re
++import unittest
++from functools import reduce
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[4]
++
++
++def load_runtime(app_source=None, markdown_source=None, count_tokens=None):
++    """Compile repository method bodies, including the precise Markdown branch."""
++    app_source = app_source or (ROOT / "rag/app/naive.py").read_text(encoding="utf-8")
++    markdown_source = markdown_source or (ROOT / "deepdoc/parser/markdown_parser.py").read_text(encoding="utf-8")
++    scope = {
++        "re": re,
++        "logging": logging,
++        "reduce": reduce,
++        "find_codec": lambda _: "utf-8",
++        "markdown": lambda text, **_: text,
++        "num_tokens_from_string": count_tokens or (lambda text: len(text.split())),
++        "concat_img": lambda first, second: (first, second),
++    }
++
++    def select(source, names):
++        nodes = [node for node in ast.parse(source).body if isinstance(node, (ast.ClassDef, ast.FunctionDef)) and node.name in names]
++        if {node.name for node in nodes} != names:
++            raise AssertionError("Required production symbols missing")
++        return ast.Module(body=nodes, type_ignores=[])
++
++    exec(compile(select(markdown_source, {"RAGFlowMarkdownParser", "MarkdownElementExtractor"}), "<actual-markdown-parser>", "exec"), scope)  # noqa: S102
++    scope["MarkdownParser"] = scope["RAGFlowMarkdownParser"]
++    names = {"Markdown", "_is_short_header"}
++    if "def _markdown_section_groups(" in app_source:
++        names.add("_markdown_section_groups")
++    exec(compile(select(app_source, names), "<actual-naive-markdown>", "exec"), scope)  # noqa: S102
++
++    chunk = next(node for node in ast.parse(app_source).body if isinstance(node, ast.FunctionDef) and node.name == "chunk")
++    branches = [node for node in chunk.body if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "is_markdown"]
++    branch = next(node for node in branches if isinstance(node.body[0], ast.Assign) and isinstance(node.body[0].targets[0], ast.Name) and node.body[0].targets[0].id == "merged_chunks")
++    wrapper = ast.parse("def pack(sections, markdown_parser, section_images, budget=512, overlap=0):\n    parser_config = {'chunk_token_num': budget}\n    overlapped_percent = overlap\n").body[0]
++    for statement in branch.body:
++        wrapper.body.append(statement)
++        if isinstance(statement, ast.Assign) and isinstance(statement.targets[0], ast.Name) and statement.targets[0].id == "chunks":
++            break
++    else:
++        raise AssertionError("Markdown packing boundary changed")
++    wrapper.body.append(ast.parse("return chunks, merged_images").body[0])
++    exec(compile(ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])), "<actual-markdown-packing>", "exec"), scope)  # noqa: S102
++    return scope
++
++
++class TestMarkdownHeadingBoundaries(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.runtime = load_runtime()
++
++    def parse(self, text, *, delimiter="\\n", parser=None):
++        parser = parser or self.runtime["Markdown"](512)
++        parser.load_images_from_urls = lambda urls, cache: (["synthetic-image"] * len(urls), cache)
++        sections, tables, images = parser("synthetic.md", text.encode(), delimiter=delimiter, return_section_images=True)
++        return parser, sections, tables, images
++
++    def pack(self, text, *, budget=14, overlap=0, delimiter="\\n"):
++        parser, sections, tables, images = self.parse(text, delimiter=delimiter)
++        chunks, merged_images = self.runtime["pack"](sections, parser, images, budget, overlap)
++        if overlap == 0:
++            self.assertEqual("\n".join(chunk[0] for chunk in sections), "\n".join(chunks))
++        self.assertEqual(len(chunks), len(merged_images))
++        return parser, sections, tables, chunks, merged_images
++
++    def test_heading_that_fits_at_previous_chunk_end_moves_with_its_body(self):
++        before = "prior " * 12
++        body = "following " * 10
++        _, _, _, chunks, _ = self.pack(before + "\n\n## Subject\n\n" + body)
++        self.assertEqual(len(chunks), 2)
++        self.assertNotIn("## Subject", chunks[0])
++        self.assertIn("## Subject\n" + body, chunks[1])
++
++    def test_long_heading_and_oversized_body_remain_literal_and_together(self):
++        heading = "## " + "heading " * 55
++        body = "body " * 40
++        _, _, _, chunks, _ = self.pack("prior\n\n" + heading + "\n\n" + body, budget=10)
++        self.assertEqual(len(chunks), 2)
++        self.assertIn(heading + "\n" + body, chunks[1])
++        self.assertGreater(len(chunks[1].split()), 10)  # Target, not a hard truncation cap.
++
++    def test_descending_heading_cascade_is_one_group(self):
++        parser, _, _, chunks, _ = self.pack("prior " * 10 + "\n\n# Parent\n## Child\n### Detail\nbody text", budget=8)
++        self.assertEqual(parser.heading_levels, [0, 1, 2, 3, 0])
++        self.assertEqual(chunks[-1].strip(), "# Parent\n## Child\n### Detail\nbody text")
++
++    def test_empty_sibling_and_ancestor_do_not_acquire_the_next_body(self):
++        for text, expected in [
++            ("# Empty\n# Actual\nbody", [[0], [1, 2]]),
++            ("# Empty\n## Empty child\n# Actual\nbody", [[0, 1], [2, 3]]),
++        ]:
++            with self.subTest(text=text):
++                parser, _, _, _, _ = self.pack(text, budget=1)
++                self.assertEqual([list(group) for group in self.runtime["_markdown_section_groups"](parser.heading_levels)], expected)
++
++    def test_final_heading_has_no_invented_body(self):
++        _, _, _, chunks, _ = self.pack("body\n\n# Final", budget=1)
++        self.assertEqual(chunks, ["body", "# Final"])
++
++    def test_standalone_thematic_break_is_not_a_body(self):
++        parser, _, _, _, _ = self.pack("# Empty\n---\n# Actual\nbody", budget=1)
++        self.assertEqual(parser.heading_levels, [1, -1, 1, 0])
++        self.assertEqual([list(group) for group in self.runtime["_markdown_section_groups"](parser.heading_levels)], [[0], [1], [2, 3]])
++
++    def test_fenced_code_headings_are_never_reclassified(self):
++        for fence in ["```", "~~~~"]:
++            with self.subTest(fence=fence):
++                code = fence + "python\n# This is code\n## Also code\n" + fence
++                parser, _, _, chunks, _ = self.pack("prior " * 12 + "\n\n## Example\n" + code + "\n# Real\nbody", budget=8)
++                self.assertEqual(parser.heading_levels, [0, 2, 0, 1, 0])
++                self.assertTrue(any("## Example\n" + code in chunk for chunk in chunks))
++
++    def test_unclosed_code_fence_preserves_the_whole_block(self):
++        parser, _, _, chunks, _ = self.pack("## Example\n```\n# Still code\nbody", budget=1)
++        self.assertEqual(parser.heading_levels, [2, 0])
++        self.assertEqual(len(chunks), 1)
++
++    def test_setext_remains_existing_text_element_without_reinterpretation(self):
++        for marker in ["===", "---"]:
++            with self.subTest(marker=marker):
++                parser, sections, _, chunks, _ = self.pack("Setext title\n" + marker + "\n\nbody", budget=1)
++                self.assertEqual(parser.heading_levels, [0])
++                self.assertEqual(chunks, [sections[0][0]])
++
++    def test_indented_heading_retains_upstream_text_block_interpretation(self):
++        parser, sections, _, chunks, _ = self.pack("  ## Indented title\n\nbody", budget=1)
++        self.assertEqual(parser.heading_levels, [0])
++        self.assertEqual(chunks, [sections[0][0]])
++
++    def test_lists_and_quotes_are_attached_as_literal_body_elements(self):
++        for body in ["- entry one\n- entry two", "> quote\n> continued"]:
++            with self.subTest(body=body):
++                _, _, _, chunks, _ = self.pack("prior " * 12 + "\n\n## Subject\n" + body, budget=4)
++                self.assertEqual(len(chunks), 2)
++                self.assertIn("## Subject\n" + body, chunks[1])
++
++    def test_zero_and_negative_budget_preserve_legacy_behavior(self):
++        text = "prior\n## Subject\nfollowing body"
++        for budget in [0, -10]:
++            with self.subTest(budget=budget):
++                parser, sections, _, images = self.parse(text)
++                actual = self.runtime["pack"](sections, parser, images, budget)
++                parser.heading_levels = None
++                self.assertEqual(actual, self.runtime["pack"](sections, parser, images, budget))
++                self.assertEqual(actual[0], ["prior", "## Subject\nfollowing body\n"])
++
++    def test_overlap_preserves_legacy_text_and_image_alignment(self):
++        parser, sections, _, images = self.parse("prior " * 12 + "\n\n## Subject\n" + "body " * 12)
++        actual = self.runtime["pack"](sections, parser, images, 14, 20)
++        parser.heading_levels = None
++        self.assertEqual(actual, self.runtime["pack"](sections, parser, images, 14, 20))
++        self.assertEqual(len(actual[0]), len(actual[1]))
++        self.assertTrue(actual[0][1].startswith(actual[0][0][-int(len(actual[0][0]) * 0.2) :]))
++
++    def test_images_keep_legacy_alignment(self):
++        parser, sections, _, chunks, images = self.pack("prior " * 12 + "\n## Subject\n![image](synthetic.png)\nbody", budget=14)
++        self.assertIsNone(parser.heading_levels)
++        self.assertEqual(len(chunks), len(images))
++        self.assertEqual(sum(image is not None for image in images), 1)
++        self.assertEqual(sum("![image]" in section[0] for section in sections), 1)
++
++    def test_tables_html_front_matter_and_custom_delimiters_keep_legacy_route(self):
++        examples = [
++            ("# Title\n\n| A | B |\n| --- | --- |\n| one | two |\n", "\\n"),
++            ("# Title\n<div>body</div>", "\\n"),
++            ("# Title\nbody <em>inline</em>", "\\n"),
++            ("# Title\n![image][reference]\n\n[reference]: synthetic.png", "\\n"),
++            ("---\nkey: value\n# YAML comment\n---\n# Title\nbody", "\\n"),
++            ("# Title\nbody\n# Next\nbody", "`\n`"),
++        ]
++        for text, delimiter in examples:
++            with self.subTest(text=text):
++                parser, _, _, _, _ = self.pack(text, delimiter=delimiter)
++                self.assertIsNone(parser.heading_levels)
++
++    def test_parser_reuse_resets_eligibility(self):
++        parser, _, _, _ = self.parse("# Title\nbody")
++        self.assertIsNotNone(parser.heading_levels)
++        self.parse("# Title\n<div>body</div>", parser=parser)
++        self.assertIsNone(parser.heading_levels)
++        self.parse("# Title\nbody", parser=parser)
++        self.assertEqual(parser.heading_levels, [1, 0])
++
++    def test_sources_are_not_copied_or_propagated(self):
++        source = "- Source: Synthetic archive, record 42."
++        _, sections, _, chunks, _ = self.pack("# Object\n" + "fact " * 20 + "\n\n# Bibliography\n" + source, budget=10)
++        self.assertEqual("\n".join(chunks).count(source), 1)
++        self.assertEqual("\n".join(chunk[0] for chunk in sections).count(source), 1)
++        self.assertNotIn(source, chunks[0])
++
++    def test_empty_input_does_not_create_chunks(self):
++        parser, sections, tables, images = self.parse("\n")
++        self.assertEqual((sections, tables, images), ([], [], []))
++        self.assertEqual(self.runtime["pack"](sections, parser, images), ([], []))
++
++
++if __name__ == "__main__":
++    unittest.main()

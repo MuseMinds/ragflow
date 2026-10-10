@@ -1,0 +1,32 @@
+{
+  "patch": "MM-RF-0021",
+  "captured_at": "2026-10-09",
+  "branch": "mm/mmd541-retrieval-candidates",
+  "base_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+  "no_commit_push_deploy": true,
+  "files": {
+    "rag/utils/es_conn.py": "cbdac16359ab3c5b3f787db257f1f8d5e976c89612b09acc083e45b0e99881ff",
+    "test/unit_test/rag/utils/test_es_hybrid_candidates.py": "b364ab1167c17e1d9d4120dfa78043b78354d0ec593ad5daac045845001bfba3",
+    "test/unit_test/rag/utils/test_es_exact_scope_provenance.py": "9faef5b3b88cb46a413f1a365bc3c397ec46c75b9ce6a6fa42519f0d28eb64fc",
+    "MUSEMIND_PATCHES.md": "a81192ae06217ec375ef3fe2adaebcbbacea2e8843ddd09dbdb25c3f39402ff8"
+  },
+  "tests_log_sha256": "4d4d95b0e801cbc6a06a1cc88cc8533492fa8d5567a8707175c31aba84c96ff5",
+  "patch_sha256": "ae245f34685e44d5cae322a9fca0da6657bc92106261a62a18c7c499bac91523",
+  "tests_passed": 54,
+  "new_tests_passed": 31,
+  "content_free": true,
+  "ledger_diff_sha256": "69a0b32505d38e30a49cf0e83da264e4d904dba5742cd1ff25e1890cb547d66c",
+  "read_only_patch_checks": [
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "output": "warning: in the working copy of 'MUSEMIND_PATCHES.md', LF will be replaced by CRLF the next time Git touches it\n"
+    },
+    {
+      "command": "git apply --reverse --check tools/musemind_patches/mm-rf-0021/source.patch",
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "patch_check_scope": "Production source and new tests only; documentation diff recorded separately"
+}

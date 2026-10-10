@@ -1,0 +1,66 @@
+{
+  "schema": "musemind.mm-rf-0024.source-validation/v1",
+  "date": "2026-10-10",
+  "base_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+  "status": "SOURCE_CHECKS_PASSED_IMMUTABLE_BUNDLE_QUALIFICATION_PENDING",
+  "adopted_runtime_matches_frozen_experiment_bytes": true,
+  "tests": {
+    "focused_regressions": 143,
+    "dataset_route_dispatch_separate_process": 8,
+    "exact_retrieval_route_separate_process": 1,
+    "total_unique_tests": 152
+  },
+  "gates": {
+    "workflow_compile_paths": 34,
+    "workflow_e9_f_lint": "PASSED",
+    "new_test_full_lint": "PASSED",
+    "protocol_source_and_tests_format": "PASSED",
+    "workflow_coverage_audit": "PASSED",
+    "git_diff_check": "PASSED"
+  },
+  "failed_attempts": [
+    {
+      "phase": "sandbox_test_run",
+      "status": "INTERRUPTED_AFTER_19_TESTS_DUE_WINDOWS_ASYNC_FIXTURE_HANG",
+      "resolution": "Same bounded tests rerun outside sandbox; 143 passed."
+    },
+    {
+      "phase": "combined_dataset_dispatch_and_existing_retrieval",
+      "status": "NINE_ASSERTIONS_PASSED_PROCESS_FAILED_ON_EVENT_LOOP_TEARDOWN_RESOURCE_WARNING",
+      "resolution": "Separate test invocations, as required by isolation of the pre-existing harness; both processes passed. No warning suppression."
+    }
+  ],
+  "local_environment": {
+    "python": "3.13.14",
+    "werkzeug_verify": "PACKAGE_PATCH_NOT_APPLIED",
+    "shared_dependencies_modified": false,
+    "full_backend_suite": "NOT_RUN: borrowed environment lacks mandatory locked multipart correction; qualified image gates remain required"
+  },
+  "ci_only_changes": "Add omitted semantic-candidate/exact-scope tests and es_conn compile/lint; add v3 dispatch test as isolated invocation.",
+  "test_source_style_delta": "Curated synonym regression import ordering normalized; runtime remains byte-identical.",
+  "sdk_contract_schema_keyword": "musemind.ragflow-dataset-create-or-adopt/v3",
+  "projection_schema": "musemind.ragflow-dataset-provider-projection/v3",
+  "runtime_models_called": 0,
+  "network_calls": 0,
+  "frozen_stacks_modified": false,
+  "content_free": true,
+  "qualification": "Freeze exact fork/image/SDK/generation, complete canonical C-01-C-09 and new materialization/retrieval/application readback before promotion.",
+  "files": {
+    "rag/utils/es_conn.py": "cbdac16359ab3c5b3f787db257f1f8d5e976c89612b09acc083e45b0e99881ff",
+    "rag/app/naive.py": "1e72aa8a78a9187184733c41754a084f92df4ba5c25502b8ed5c1b232f9f27a3",
+    "rag/nlp/synonym.py": "48483362f7b9ad6f7679d6647a2ab1f643480ba2323c54e670a204cf82267d1d",
+    "api/utils/musemind_provider_contract.py": "2b9b12a47debdf5d1c863d104fbf46da386b8522ab26eb97a5db018d331e4d93",
+    "api/apps/restful_apis/dataset_api.py": "2b781ba662d7f0d11acc3e4e7571d141fe4169f1fe59501ecd6542101ad04c9d",
+    "api/apps/services/dataset_api_service.py": "f9c2d33e7bd5224e09396a513df3834e629534b03c3c497b7bf6261fee74b23a",
+    "sdk/python/ragflow_sdk/ragflow.py": "bbd8ed10e732122007bc773825f4dbe40cc8b64a3c78bb960a6c2b6ca0c392b4",
+    ".github/workflows/musemind-provider-contract.yml": "f185c4fbf0311288fd8774b14b04c65652df27bf8c1a55b1ec1b521354807b28",
+    "test/unit_test/api/apps/test_musemind_exact_dataset_route.py": "9668041752ed6c97208078793a5ec91087da761b6a4ac13c5a2ca8ba30520b0e",
+    "test/unit_test/api/utils/test_musemind_provider_contract.py": "f313c3114bd665d3133b944c597f8915996aa05a28921904412dd3282c186bb7",
+    "test/unit_test/api/apps/services/test_musemind_dataset_current_registry.py": "f24987c6dd32a17fe36880ded4059d0381336c04a43c813bdd13f18537b56068",
+    "test/unit_test/sdk/test_musemind_exact_dataset_contract.py": "e88f5b2ade02a0b22ee22e994a409c2cf084ce3faec92e366fdf677b563d0b81",
+    "test/unit_test/rag/utils/test_es_hybrid_candidates.py": "b364ab1167c17e1d9d4120dfa78043b78354d0ec593ad5daac045845001bfba3",
+    "test/unit_test/rag/utils/test_es_exact_scope_provenance.py": "9faef5b3b88cb46a413f1a365bc3c397ec46c75b9ce6a6fa42519f0d28eb64fc",
+    "test/unit_test/rag/app/test_markdown_heading_boundaries.py": "6ec6ba1cb50197634cf977ab3e18000293ad134adac5e1b97e1bb829d7fb141c",
+    "test/unit_test/rag/nlp/test_curated_synonyms.py": "0529118d66b2bfd2dee7c1bd9f7c3abae59874ea0773b8c21c5cdadb02d2abf7"
+  }
+}

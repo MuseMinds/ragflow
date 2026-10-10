@@ -59,8 +59,33 @@ jobs:
       - name: Preserve document cancellation across task callbacks
         run: .venv/bin/pytest test/unit_test/api/db/test_musemind_cancelled_document_progress.py
 
-      - name: Reject whitespace errors
-        run: git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}"
+      - name: Preserve plain Markdown heading and body boundaries
+        run: .venv/bin/python -B -m unittest discover -s test/unit_test/rag/app -p 'test_markdown_heading_boundaries.py' -v
+
+      - name: Preserve deterministic curated lexical expansion
+        run: .venv/bin/python -B -m unittest discover -s test/unit_test/rag/nlp -p 'test_curated_synonyms.py' -v
+
+      - name: Preserve semantic candidates and exact scope provenance
+        run: >-
+          .venv/bin/pytest --noconftest
+          test/unit_test/rag/utils/test_es_hybrid_candidates.py
+          test/unit_test/rag/utils/test_es_exact_scope_provenance.py
+
+      - name: Preserve historical patch receipts and reject source whitespace errors
+        run: |
+          # Unified-diff blank context lines contain a required single space. These four
+          # historical receipts are byte-frozen instead of being rewritten for diff --check.
+          sha256sum --check <<'HASHES'
+          69a0b32505d38e30a49cf0e83da264e4d904dba5742cd1ff25e1890cb547d66c  tools/musemind_patches/mm-rf-0021/ledger.diff
+          ae245f34685e44d5cae322a9fca0da6657bc92106261a62a18c7c499bac91523  tools/musemind_patches/mm-rf-0021/source.patch
+          b196f26e9e47f8b57ed5ca012cfe04b24617347e87ddb91baf7ac7a49d8796c5  tools/musemind_patches/mm-rf-0022/source.patch
+          54abec2081047649087fbe340a1435c1c9b063a4d24336a0bb296c71b64bdf1e  tools/musemind_patches/mm-rf-0022/source-02.patch
+          HASHES
+          git diff --check "${{ github.event.pull_request.base.sha || github.event.before }}" "${{ github.sha }}" -- . \
+            ':!tools/musemind_patches/mm-rf-0021/ledger.diff' \
+            ':!tools/musemind_patches/mm-rf-0021/source.patch' \
+            ':!tools/musemind_patches/mm-rf-0022/source.patch' \
+            ':!tools/musemind_patches/mm-rf-0022/source-02.patch'
 
       - name: Require immutable C-01 build inputs
         run: |
@@ -169,8 +194,11 @@ jobs:
           rag/svr/task_executor_refactor/chunk_service.py
           rag/svr/task_executor_refactor/embedding_service.py
           rag/utils/base64_image.py
+          rag/utils/es_conn.py
           deepdoc/parser/mineru_parser.py
           deepdoc/parser/figure_parser.py
+          rag/app/naive.py
+          rag/nlp/synonym.py
           rag/app/picture.py
           rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
@@ -204,8 +232,11 @@ jobs:
           rag/svr/task_executor_refactor/chunk_service.py
           rag/svr/task_executor_refactor/embedding_service.py
           rag/utils/base64_image.py
+          rag/utils/es_conn.py
           deepdoc/parser/mineru_parser.py
           deepdoc/parser/figure_parser.py
+          rag/app/naive.py
+          rag/nlp/synonym.py
           rag/app/picture.py
           rag/utils/minio_conn.py
           sdk/python/ragflow_sdk/modules/base.py
@@ -213,6 +244,7 @@ jobs:
           sdk/python/ragflow_sdk/ragflow.py
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py
           test/unit_test/api/apps/test_auth_logging_contract.py
+          test/unit_test/api/apps/test_musemind_exact_dataset_route.py
           test/unit_test/api/apps/services/test_musemind_dataset_create_adopt.py
           test/unit_test/api/apps/services/test_musemind_dataset_current_registry.py
           test/unit_test/api/db/joint_services/test_tenant_model_service_max_tokens.py
@@ -221,6 +253,10 @@ jobs:
           test/unit_test/api/db/services/test_llm_service_gemini_content_free.py
           test/unit_test/api/utils/test_musemind_provider_contract.py
           test/unit_test/rag/utils/test_minio_conn_exact_prefix.py
+          test/unit_test/rag/utils/test_es_hybrid_candidates.py
+          test/unit_test/rag/utils/test_es_exact_scope_provenance.py
+          test/unit_test/rag/app/test_markdown_heading_boundaries.py
+          test/unit_test/rag/nlp/test_curated_synonyms.py
           test/unit_test/rag/utils/test_base64_image.py
           test/unit_test/rag/llm/test_gemini_cv_generation_v2.py
           test/unit_test/rag/svr/task_executor_refactor/test_embedding_service.py
@@ -252,6 +288,9 @@ jobs:
           test/unit_test/rag/llm/test_gemini_cv_generation_v2.py
           test/unit_test/rag/svr/task_executor_refactor/test_embedding_service.py
           test/unit_test/deepdoc/parser/test_mineru_parser.py
+
+      - name: Test exact dataset protocol dispatch
+        run: .venv/bin/pytest --noconftest test/unit_test/api/apps/test_musemind_exact_dataset_route.py
 
       - name: Test exact retrieval route
         run: >-
