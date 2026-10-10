@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import importlib.metadata
 import json
+import platform
 import subprocess
 import sys
 import zipfile
@@ -121,6 +122,8 @@ def main() -> int:
                     "source_commit": expected["source_commit"],
                     "quart_parser_cases": cases,
                     "source_file_count": len(expected["files"]),
+                    "python_version": platform.python_version(),
+                    "dependency_versions": {name: importlib.metadata.version(name) for name in ("anyio", "fsspec", "pyjwt", "pypdf", "urllib3", "nltk")},
                     "werkzeug_version": importlib.metadata.version("werkzeug"),
                     "werkzeug_source_sha256": patch["source_sha256"],
                     **sdk,

@@ -43,6 +43,7 @@ jobs:
           UV_HTTP_RETRIES: "10"
         run: |
           uv sync --python 3.13 --group test --frozen
+          uv lock --check --python 3.13
           uv pip install -e sdk/python
 
       - name: Apply and verify locked multipart byte-preservation correction
@@ -55,6 +56,9 @@ jobs:
 
       - name: Test candidate scan evidence guards
         run: .venv/bin/python -B -m unittest discover -s tools/musemind_build -p 'test_*.py'
+
+      - name: Preserve JWT and PDF compatibility after security updates
+        run: .venv/bin/pytest --noconftest test/unit_test/tools/test_musemind_security_dependencies.py
 
       - name: Preserve document cancellation across task callbacks
         run: .venv/bin/pytest test/unit_test/api/db/test_musemind_cancelled_document_progress.py
@@ -117,10 +121,12 @@ jobs:
 
           floors = {
               "aiohttp": "3.14.3",
+              "anyio": "4.14.2",
               "azure-core": "1.38.0",
               "cbor2": "5.9.0",
               "cryptography": "50.0.0",
               "curl-cffi": "0.15.0",
+              "fsspec": "2026.6.0",
               "httplib2": "0.32.0",
               "json-repair": "0.60.1",
               "litellm": "1.84.0",
@@ -135,11 +141,11 @@ jobs:
               "protobuf": "5.29.6",
               "pyarrow": "23.0.1",
               "pyasn1": "0.6.4",
-              "pyjwt": "2.13.0",
-              "pypdf": "6.14.2",
+              "pyjwt": "2.15.0",
+              "pypdf": "6.19.0",
               "setuptools": "84.0.0",
               "soupsieve": "2.8.4",
-              "urllib3": "2.7.0",
+              "urllib3": "2.8.0",
               "xgboost-cpu": "2.1.4",
           }
 
@@ -264,6 +270,7 @@ jobs:
           test/unit_test/sdk/test_ragflow_request_timeout.py
           test/unit_test/sdk/test_musemind_exact_dataset_contract.py
           test/unit_test/tools/test_musemind_c05_parser_intake_conformance.py
+          test/unit_test/tools/test_musemind_security_dependencies.py
           test/unit_test/tools/test_musemind_create_adopt_conformance.py
           test/unit_test/tools/test_musemind_exact_scope_conformance.py
           test/unit_test/tools/musemind_conformance/test_jina_generation.py

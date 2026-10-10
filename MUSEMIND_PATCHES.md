@@ -709,6 +709,51 @@ generation remains immutable; neither a unit-test pass nor the private visit sub
 these gates. New source revisions and application generation/binding contracts belong to their
 own repositories, not to this provider ledger.
 
+## MM-RF-0025 — bounded application dependency remediation
+
+- Base: upstream `v0.26.4` (`cb93883f3f8c975eecb2fed81210effeb3bdb06f`), protected
+  MuseMind source `5c8af590037b9072e12ce9f8e5f103a1706f7735`. This is a separate
+  dependency-only follow-up to the accepted MM-RF-0021–0024 consolidation, with no upstream sync.
+- Trigger: clean-image workflow `38042679630` completed the build/runtime checks but blocked
+  publication on [fresh application findings](tools/musemind_patches/mm-rf-0025/failed-scan-summary.json):
+  2 Critical and 17 High. The failed image was not
+  pushed, qualified or deployed. Existing stateful-image acceptance does not cover this image.
+- Changes: AnyIO `4.12.1 -> 4.14.2`, fsspec `2026.1.0 -> 2026.6.0`, PyJWT `2.13.0 -> 2.15.0`,
+  pypdf `6.15.0 -> 6.19.0`, urllib3 `2.7.0 -> 2.8.0`. PyJWT 2.15 includes the additional
+  pre-verification JWKS payload-error correction beyond the six findings fixed in 2.14.
+  The known NLTK 3.10.3 finding remains unchanged and requires a separate exact-image disposition;
+  neither removing NLTK nor changing tokenization is part of this patch.
+- Resolver: genuine complete `uv 0.11.28` output, using only five exact `--upgrade-package`
+  selectors against the previous lock. Repeated Aliyun `.whl.metadata` 404s for unrelated locked
+  packages required using the official PyPI default index. No unsafe multi-index resolution,
+  manually spliced lock entries or hand-edited hashes are used. This creates many locator changes,
+  but only the five selected versions change across 651 entries. The
+  [machine comparison](tools/musemind_patches/mm-rf-0025/lock-comparison.json) verifies identical
+  remaining dependency/optional/development edges and resolution markers, and all 2,550 previous
+  artifact hashes outside those five packages remain present and unchanged. The default image
+  build already selected PyPI through the existing `NEED_MIRROR=0` rewriting path.
+- Primary references, reviewed 2026-10-10: [PyJWT](https://github.com/jpadilla/pyjwt/releases/tag/2.15.0),
+  [AnyIO](https://github.com/agronholm/anyio/security/advisories/GHSA-82r6-8w77-94w6),
+  [fsspec](https://github.com/fsspec/filesystem_spec/security/advisories/GHSA-27vj-qcqg-25rc),
+  [pypdf](https://github.com/py-pdf/pypdf/releases/tag/6.19.0),
+  [urllib3](https://github.com/urllib3/urllib3/releases/tag/2.8.0),
+  [remaining NLTK advisory](https://github.com/nltk/nltk/security/advisories/GHSA-8mgp-746c-j5xp).
+- Validation: lock consistency is checked independently of frozen installation. Required CI
+  verifies installed security floors and exercises the actual JWT/JWKS and PDF intake libraries
+  on synthetic inputs, alongside all existing provider/parser/SDK/source checks. The actual-image
+  smoke reports the Python patch release and these installed distribution versions. Full-image
+  SBOM/vulnerability/secret scans keep their previous thresholds and finding rules.
+- Semantic limits: pypdf fixes can affect PDF parsing/text extraction; source-byte preservation
+  of the Markdown candidate is not general PDF equivalence. C-04/C-05 parser checks and the
+  exact new immutable generation, dataset/readback, retrieval and rebuild qualification remain
+  required. Models, retry policy, Markdown parser, tokenizer, lexical dictionary behavior,
+  ranking weights, scope and generation DTO logic retain the accepted source bytes.
+- Promotion: a clean final build, fresh application C-01 disposition and the full frozen C-01–C-09
+  matrix precede successor publication. The anticipated removal of eighteen findings is not a
+  scan result. Keep the failed build as failed evidence; no historical acceptance or PASS is
+  transferred. Rollback uses a previously qualified whole bundle/generation, never an in-place
+  change to stored generation identities or existing datasets.
+
 ## Qualification status
 
 | Evidence | Status |
