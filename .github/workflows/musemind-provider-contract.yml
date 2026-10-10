@@ -78,6 +78,9 @@ jobs:
           test/unit_test/rag/utils/test_es_hybrid_candidates.py
           test/unit_test/rag/utils/test_es_exact_scope_provenance.py
 
+      - name: Preserve explicit vector dimensions for supported generations
+        run: .venv/bin/python -B -m unittest discover -s test/unit_test/rag/utils -p 'test_es_vector_mapping.py' -v
+
       - name: Preserve historical patch receipts and reject source whitespace errors
         run: |
           # Unified-diff blank context lines contain a required single space. These four

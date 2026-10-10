@@ -96,7 +96,7 @@ jobs:
                    "api/apps/services/dataset_api_service.py",
                    "common/compilation_template.py", "api/apps/restful_apis/chunk_api.py",
                    "rag/svr/task_executor_refactor/chunk_post_processor.py",
-                   "rag/svr/task_executor_refactor/dataset_wiki_generator.py"]
+                   "rag/svr/task_executor_refactor/dataset_wiki_generator.py", "conf/mapping.json"]
           result = {"source_commit": os.environ["SOURCE_SHA"],
                     "version": subprocess.check_output(["git", "describe", "--tags", "--match=v*", "--first-parent", "--always"], text=True).strip(),
                     "files": {path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() for path in paths},
