@@ -1,0 +1,107 @@
+{
+  "patch": "MM-RF-0022",
+  "date": "2026-10-09",
+  "status": "LOCAL_SOURCE_ONLY_NOT_QUALIFIED",
+  "base_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+  "branch": "mm/mmd541-retrieval-candidates",
+  "files_sha256": {
+    "rag/app/naive.py": "1e72aa8a78a9187184733c41754a084f92df4ba5c25502b8ed5c1b232f9f27a3",
+    "test/unit_test/rag/app/test_markdown_heading_boundaries.py": "6ec6ba1cb50197634cf977ab3e18000293ad134adac5e1b97e1bb829d7fb141c",
+    "MUSEMIND_PATCHES.md": "d03f6a6843790b61ff812a48f1b7e216319f27499caafa74950b7812ed383ff2"
+  },
+  "source_text_sha256": {
+    "rag/app/naive.py": "b872e6a708f1f07d49ecd6458a7f07e26b442acecd9c0c87535117615616a88e",
+    "deepdoc/parser/markdown_parser.py": "94c8e2515d05e141fcf65e10336ceca7f9116e54b31a668637ba3f901943cb66",
+    "test/unit_test/rag/app/test_markdown_heading_boundaries.py": "6ec6ba1cb50197634cf977ab3e18000293ad134adac5e1b97e1bb829d7fb141c",
+    "test/unit_test/deepdoc/parser/test_naive_markdown_merge.py": "ea16db0872f8295ebb1d11f742a3c8274a172c0acff13423ff40722ddd1300d1",
+    "test/unit_test/deepdoc/parser/test_markdown_parser.py": "00696c2f29f1a23b9ad8ee08727c31a17ee314adf9a9c75521f26387658d3d7a"
+  },
+  "tests": {
+    "passed": 42,
+    "subtests_passed": 16,
+    "receipt_sha256": "49c23ad119bf67e22399c769a7c8484b575815364afe57a5a87574fbb5e210b1",
+    "log_sha256": "2af6a4cba07dcad2758896bb6f5dcf05d90506056761dd2d13f5d481e1573b74"
+  },
+  "style_receipt_sha256": "868ae12280cc3fac4c33dc3a945db5dbb5a79b2c7b5c3297a1a3d108c10cea12",
+  "source_patch_sha256": "b196f26e9e47f8b57ed5ca012cfe04b24617347e87ddb91baf7ac7a49d8796c5",
+  "reverse_patch_check_exit_code": 0,
+  "private_actual_source_replay": {
+    "receipt_sha256": "02814da00284629f7b1d2af16f3f58c5becb7d5adbd3d4cf739ed4add50d9f02",
+    "documents": 188,
+    "eligible": 188,
+    "observed_unique_chunks": 174,
+    "frozen_baseline_observed_matches": 174,
+    "before": {
+      "bibliography_only_chunks": 100,
+      "chunks": 441,
+      "max_tokens": 900,
+      "over_512": 103,
+      "total_tokens": 169829,
+      "trailing_heading_chunks": 147
+    },
+    "after": {
+      "bibliography_only_chunks": 100,
+      "chunks": 443,
+      "max_tokens": 900,
+      "over_512": 105,
+      "total_tokens": 169938,
+      "trailing_heading_chunks": 0
+    },
+    "literal_element_stream_preserved_documents": 188,
+    "attached_groups_present_whole_documents": 188,
+    "excluded_path_frozen_comparisons": [
+      {
+        "case": "zero_budget",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "negative_budget",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "overlap",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "image",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "reference_image",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "table",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "html",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "front_matter",
+        "identical_frozen_parse_chunks_images_tables": true
+      },
+      {
+        "case": "custom_delimiter",
+        "identical_frozen_parse_chunks_images_tables": true
+      }
+    ],
+    "tokenizer": {
+      "encoder_function_sha256": "add66bf4ffc7b4e9db7068a6fb4ecd5c8c37d0b4308fb66c9b1fb48523db14f4",
+      "package_version": "0.12.0",
+      "vocabulary_sha256": "223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"
+    }
+  },
+  "no_commit_push_deploy": true,
+  "network_model_embedding_calls": 0,
+  "provider_state_changed": false,
+  "content_free": true,
+  "limits": [
+    "Literal stream means newline-joined original parser elements, not byte-identical raw Markdown; upstream parsing already removes/normalizes some separators.",
+    "The 512-token target is not a hard cap; indivisible headings/body elements can exceed it and are reported.",
+    "Bibliographies are not propagated or semantically assigned to claims. Empty/final headings are not repaired by inventing text.",
+    "Setext headings retain the existing text-block interpretation; media, raw HTML, custom delimiters, front matter, nonpositive budget and overlap use the frozen behavior.",
+    "This local parser replay is not an ingestion, retrieval or answer-quality test. New bundle/generation and fresh materialization qualification remain necessary."
+  ]
+}

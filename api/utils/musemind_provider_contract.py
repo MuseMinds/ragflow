@@ -15,7 +15,7 @@
 #
 import re
 from pathlib import Path
-from typing import Annotated, Any, Callable, Literal
+from typing import Annotated, Any, Callable, ClassVar, Literal
 
 import rfc8785
 from peewee import IntegrityError
@@ -25,6 +25,7 @@ from api.utils.validation_utils import ParentChildConfig, ParserConfig, RaptorCo
 
 MUSEMIND_DATASET_PROJECTION_SCHEMA = "musemind.ragflow-dataset-provider-projection/v1"
 MUSEMIND_DATASET_PROJECTION_SCHEMA_V2 = "musemind.ragflow-dataset-provider-projection/v2"
+MUSEMIND_DATASET_PROJECTION_SCHEMA_V3 = "musemind.ragflow-dataset-provider-projection/v3"
 MUSEMIND_DATASET_COLLISION = "PROVIDER_DATASET_IDENTITY_COLLISION"
 
 
@@ -81,6 +82,7 @@ class MuseMindDatasetProviderProjectionV2(BaseModel):
     """Pinned Gemini generation-v2 dataset projection."""
 
     model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    pinned_vector_weight: ClassVar[float] = 0.3
 
     language: Literal["Italian"]
     embd_id: Literal["gemini-embedding-2@musemind@Gemini"]
@@ -99,9 +101,9 @@ class MuseMindDatasetProviderProjectionV2(BaseModel):
             raise ValueError("parser model IDs must match the pinned projection")
         expected_parser = MuseMindParserConfigV2(llm_id=self.llm_id, img2txt_id=self.img2txt_id)
         if self.parser_config.model_dump() != expected_parser.model_dump():
-            raise ValueError("parser_config must match the pinned generation-v2 profile")
-        if self.similarity_threshold != 0.2 or self.vector_similarity_weight != 0.3 or self.pagerank != 0:
-            raise ValueError("retrieval fields must match the pinned generation-v2 profile")
+            raise ValueError("parser_config must match the pinned generation profile")
+        if self.similarity_threshold != 0.2 or self.vector_similarity_weight != self.pinned_vector_weight or self.pagerank != 0:
+            raise ValueError("retrieval fields must match the pinned generation profile")
         return self
 
 
@@ -111,6 +113,20 @@ class MuseMindDatasetCreateOrAdoptV2(BaseModel):
     contract_schema: Literal["musemind.ragflow-dataset-create-or-adopt/v2"] = Field(alias="schema", serialization_alias="schema")
     dataset_id: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$"), Field(...)]
     provider_projection: MuseMindDatasetProviderProjectionV2
+
+
+class MuseMindDatasetProviderProjectionV3(MuseMindDatasetProviderProjectionV2):
+    """Generation-v3 transport; all v2 fields remain pinned except final weight."""
+
+    pinned_vector_weight: ClassVar[float] = 1.0
+
+
+class MuseMindDatasetCreateOrAdoptV3(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    contract_schema: Literal["musemind.ragflow-dataset-create-or-adopt/v3"] = Field(alias="schema", serialization_alias="schema")
+    dataset_id: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$"), Field(...)]
+    provider_projection: MuseMindDatasetProviderProjectionV3
 
 
 def canonical_dataset_projection_bytes(projection: dict[str, Any]) -> bytes:
@@ -134,7 +150,11 @@ def normalized_dataset_projection(dataset: Any, schema: str = MUSEMIND_DATASET_P
         "name": dataset.name,
         "language": dataset.language,
         "embd_id": dataset.embd_id,
-        **({"llm_id": dataset.parser_config.get("llm_id"), "img2txt_id": dataset.parser_config.get("img2txt_id")} if schema == MUSEMIND_DATASET_PROJECTION_SCHEMA_V2 else {}),
+        **(
+            {"llm_id": dataset.parser_config.get("llm_id"), "img2txt_id": dataset.parser_config.get("img2txt_id")}
+            if schema in {MUSEMIND_DATASET_PROJECTION_SCHEMA_V2, MUSEMIND_DATASET_PROJECTION_SCHEMA_V3}
+            else {}
+        ),
         "parser_id": dataset.parser_id,
         "parser_config": dataset.parser_config,
         "similarity_threshold": dataset.similarity_threshold,

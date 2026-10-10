@@ -19,16 +19,7 @@ import json
 import os
 import time
 import re
-from nltk.corpus import wordnet
 from common.file_utils import get_project_base_directory
-
-
-# Forces NLTK to load the corpus synchronously once, preventing concurrent tasks
-# from triggering the lazy-loading race condition.
-try:
-    wordnet.ensure_loaded()
-except Exception:
-    logging.warning("Fail to load wordnet.ensure_loaded()")
 
 
 class Dealer:
@@ -90,14 +81,10 @@ class Dealer:
         if res:  # Found in dictionary → return directly
             return res[:topn]
 
-        # 2) If not found and tk is purely alphabetical → fallback to WordNet
-        if re.fullmatch(r"[a-z]+", tk):
-            wn_set = {re.sub("_", " ", syn.name().split(".")[0]) for syn in wordnet.synsets(tk)}
-            wn_set.discard(tk)  # Remove the original token itself
-            wn_res = [t for t in wn_set if t]
-            return wn_res[:topn]
-
-        # 3) Nothing found in either source
+        # No language or sense context is available here. Expand only explicit
+        # dictionary entries, preserving their authored order and topn limit.
+        # An English WordNet fallback also expands unrelated Latin-script words
+        # and selecting from a set makes both terms and order process-dependent.
         return []
 
 

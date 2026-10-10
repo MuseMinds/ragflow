@@ -85,6 +85,25 @@ def _is_short_header(text, max_tokens=50):
     return num_tokens_from_string(text) < max_tokens
 
 
+def _markdown_section_groups(heading_levels):
+    """Keep original ATX headings and their next body element indivisible.
+
+    Levels come from the default Markdown extractor: positive for headers, zero
+    for body, negative for a standalone thematic break. Only descending heading
+    hierarchies attach; empty sibling/ancestor headings never acquire a body.
+    """
+    index = 0
+    while index < len(heading_levels):
+        end = index + 1
+        if heading_levels[index] > 0:
+            while end < len(heading_levels) and heading_levels[end] > heading_levels[end - 1]:
+                end += 1
+            if end < len(heading_levels) and heading_levels[end] == 0:
+                end += 1
+        yield range(index, end)
+        index = end
+
+
 def _normalize_section_text_for_rtl_presentation_forms(sections):
     if not sections:
         return sections
@@ -857,6 +876,23 @@ class Markdown(MarkdownParser):
         image_refs = self.extract_image_urls_with_lines(parsing_text)
         element_sections = extractor.extract_elements(delimiter, include_meta=True)
 
+        # Preserve existing media/custom-delimiter/front-matter handling. Header
+        # metadata is reliable here only for the default plain-Markdown path.
+        self.heading_levels = None
+        if (
+            separate_tables
+            and not tables
+            and not image_refs
+            and "![" not in parsing_text
+            and not (delimiter and extractor.get_delimiters(delimiter))
+            and not re.search(r"<[A-Za-z/!?]", parsing_text)
+            and not re.match(r"\s*(?:\ufeff)?---(?:\r?\n|$)", txt)
+        ):
+            self.heading_levels = [
+                len(element["content"]) - len(element["content"].lstrip("#")) if element["type"] == "header" else -1 if element["content"].strip() in {"---", "***", "___"} else 0
+                for element in element_sections
+            ]
+
         sections = []
         section_images = []
         image_cache = {}
@@ -1182,18 +1218,22 @@ def chunk(filename, binary=None, from_page=0, to_page=MAXIMUM_PAGE_NUMBER, lang=
         merged_chunks = []
         merged_images = []
         chunk_limit = max(0, int(parser_config.get("chunk_token_num", 128)))
+        keep_headers = markdown_parser.heading_levels is not None and chunk_limit > 0 and overlapped_percent == 0
+        section_groups = _markdown_section_groups(markdown_parser.heading_levels) if keep_headers else ((idx,) for idx in range(len(sections)))
 
         current_text = ""
         current_tokens = 0
         current_image = None
 
-        for idx, sec in enumerate(sections):
-            text = sec[0] if isinstance(sec, tuple) else sec
-            sec_tokens = num_tokens_from_string(text)
-            sec_image = section_images[idx] if section_images and idx < len(section_images) else None
+        for group in section_groups:
+            texts = [sections[idx][0] if isinstance(sections[idx], tuple) else sections[idx] for idx in group]
+            text = "\n".join(texts)
+            sec_tokens = sum(num_tokens_from_string(part) for part in texts)
+            sec_image = section_images[group[0]] if section_images and group[0] < len(section_images) else None
 
-            # Don't finalize chunk if current_text is a short header (force merge with next section)
-            if current_text and not _is_short_header(current_text) and current_tokens + sec_tokens > chunk_limit:
+            # Plain Markdown groups already include the body, even for long
+            # headings. Preserve the legacy short-header rule on other paths.
+            if current_text and (keep_headers or not _is_short_header(current_text)) and current_tokens + sec_tokens > chunk_limit:
                 merged_chunks.append(current_text)
                 merged_images.append(current_image)
                 overlap_part = ""

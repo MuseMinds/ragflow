@@ -1,0 +1,58 @@
+{
+  "schema": "musemind.ragflow-qualification-impact/v1",
+  "captured_at": "2026-10-09",
+  "patch": "MM-RF-0021",
+  "status": "LOCAL_SOURCE_ONLY_QUALIFICATION_PENDING",
+  "candidate": {
+    "base_source_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+    "branch": "mm/mmd541-retrieval-candidates",
+    "source_commit": null,
+    "manifest_digest": null,
+    "generation": null
+  },
+  "changed_dependencies": [
+    "Elasticsearch hybrid candidate selection: lexical query removed from kNN pre-filter"
+  ],
+  "preserved_contracts": [
+    "Exact dataset/document scope with pair membership before retrieval and whole-result provenance after retrieval",
+    "Existing condition filters, availability, exclusions and legacy chunk-ID alternatives",
+    "Text leg, vector parameters, similarity threshold, fusion weights and downstream reranking",
+    "Client, endpoint, wire schema, embedder, model, dimension, normalization and locked dependencies",
+    "Frozen registry, bundle, running provider and rollback generation remain unchanged"
+  ],
+  "required_target_reruns": [
+    "Application C-01: immutable linux/amd64 build, embedded SDK identity, scans and disposition",
+    "Generation JCS/projection/readback for a new immutable output-affecting generation",
+    "C-02/C-03: exact scope and chunk closure, including two museums and cross-Cartesian pair negatives",
+    "C-08: new generation with exact dataset create/adopt and clean museum-owned materialization",
+    "C-09: clean rebuild and equivalence on the exact candidate",
+    "Bounded multilingual hybrid retrieval and current-turn grounding regression on the exact candidate",
+    "Full C-01-C-09 on the frozen release candidate before first publish"
+  ],
+  "carry_forward": {
+    "status": "NOT_CLAIMED",
+    "condition": "Only evidence with identical digests, configuration and harness dependencies may be carried forward after comparison"
+  },
+  "local_validation": {
+    "status": "SOURCE_REGRESSIONS_PASSED_LIVE_READ_ONLY_DIAGNOSTIC_COMPLETE",
+    "tests_passed": 54,
+    "new_tests_passed": 31,
+    "tests_log": "source-validation.log",
+    "baseline_regression_and_lint_comparison": "source-baseline-comparison.json",
+    "live_diagnostic": "es-recall-diagnostic.json",
+    "baseline_semantic_regressions_fail": 2,
+    "required_ci_lint": "E9,F passed; new tests full lint/format passed",
+    "full_lint": "41 inherited source diagnostics; zero new",
+    "full_format": "All three touched Python files pass; only inserted-line CRLF normalized",
+    "werkzeug_verify": "PACKAGE_PATCH_NOT_APPLIED in existing local venv; no shared dependency changed",
+    "full_backend_suite": "NOT_RUN: existing local environment lacks mandatory locked multipart correction; dependency provisioning and service/model integration runs outside this bounded source task",
+    "style_log": "source-style-validation.log",
+    "additional_live_diagnostic": "es-recall-additional-diagnostic.json",
+    "authorized_query_embeddings_total": 4,
+    "answer_generations_total": 0,
+    "ranking_policy_ablation": "Diagnostic only; non-0.3 weights incompatible with generation-v2 and not recommended without independent general holdout"
+  },
+  "remote_mutations": false,
+  "running_provider_mutations": false,
+  "content_free": true
+}

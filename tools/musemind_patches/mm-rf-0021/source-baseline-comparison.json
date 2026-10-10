@@ -1,0 +1,13 @@
+{
+  "baseline_source_commit": "9666c8a2db08b006c2bd31863708f615f911e63f",
+  "semantic_regressions_fail_on_baseline": 2,
+  "new_ruff_diagnostics": 0,
+  "baseline_ruff_diagnostics": 41,
+  "current_ruff_diagnostics": 41,
+  "format_exit_codes_baseline_current": [
+    0,
+    0
+  ],
+  "format_comparison_method": "Original base file and current source with repository config; final inserted-line CRLF normalized, no unrelated source reformat",
+  "final_style_receipt": "source-style-validation.log"
+}

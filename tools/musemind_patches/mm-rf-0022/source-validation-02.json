@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "pytest_exit_code": 0,
+  "log": "..uu.uu.....uu....uu...uuuuuu..uu.........................               [100%]\n42 passed, 16 subtests passed in 0.60s\n",
+  "tokenizer_version": "0.12.0",
+  "tokenizer_sha256": "223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7",
+  "method": "Existing parser tests and new tests against actual source; existing short-header test imports exact AST function with real pinned local cl100k encoder. App/model/storage startup is bypassed. No shared dependency, cache, or source writes.",
+  "network_calls": 0,
+  "source_text_sha256": {
+    "rag/app/naive.py": "b872e6a708f1f07d49ecd6458a7f07e26b442acecd9c0c87535117615616a88e",
+    "deepdoc/parser/markdown_parser.py": "94c8e2515d05e141fcf65e10336ceca7f9116e54b31a668637ba3f901943cb66",
+    "test/unit_test/rag/app/test_markdown_heading_boundaries.py": "29ad0e663f75e1365904c8e00e9a2a2784519d6caf2897022a155c9dee74a410",
+    "test/unit_test/deepdoc/parser/test_naive_markdown_merge.py": "ea16db0872f8295ebb1d11f742a3c8274a172c0acff13423ff40722ddd1300d1",
+    "test/unit_test/deepdoc/parser/test_markdown_parser.py": "00696c2f29f1a23b9ad8ee08727c31a17ee314adf9a9c75521f26387658d3d7a"
+  },
+  "runner_sha256": "e0b1b5a61ef49a1780f3ada26e7f9d11bd82e44fda84cd73033629178313a8a2",
+  "tokenizer_loader_script_sha256": "aaed719f06e59de793faefced8a5c08a887ae8931e4b52f398f12532c9bcc530"
+}

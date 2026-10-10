@@ -187,6 +187,9 @@ class ESConnection(ESConnectionBase):
             else:
                 raise Exception(f"Condition `{str(k)}={str(v)}` value type is {str(type(v))}, expected to be int, str or list.")
 
+        # Both retrieval legs share scope/eligibility, but lexical relevance must
+        # not gate vector candidates. Snapshot before adding match expressions.
+        knn_filter = copy.deepcopy(bool_query.to_dict())
         s = Search()
         vector_similarity_weight = 0.5
         for m in match_expressions:
@@ -217,7 +220,7 @@ class ESConnection(ESConnectionBase):
                     m.topn,
                     m.topn * 2,
                     query_vector=list(m.embedding_data),
-                    filter=bool_query.to_dict(),
+                    filter=knn_filter,
                     similarity=similarity,
                 )
 

@@ -1,0 +1,15 @@
+{
+  "method": "Ruff full-file findings compared by code/message/multiplicity against HEAD; line numbers move with the patch.",
+  "baseline_findings": 78,
+  "candidate_findings": 78,
+  "new_findings": [],
+  "removed_findings": [],
+  "new_test_lint": {
+    "exit_code": 0,
+    "log": "All checks passed!\n"
+  },
+  "format": {
+    "exit_code": 0,
+    "log": "2 files already formatted\n"
+  }
+}
