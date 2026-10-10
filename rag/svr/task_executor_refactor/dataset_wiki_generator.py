@@ -51,6 +51,7 @@ from typing import AsyncIterator, Callable, Dict, List, Optional
 import xxhash
 
 from common import settings
+from common.compilation_template import compilation_template_kind as _compilation_template_kind
 from common.constants import LLMType
 from common.misc_utils import thread_pool_exec
 from rag.nlp import search
@@ -540,8 +541,6 @@ async def run_wiki(
         get_tenant_default_model_by_type,
         get_model_config_from_provider_instance,
     )
-    from api.apps.restful_apis.chunk_api import _compilation_template_kind
-
     progress = ctx.progress_cb
     progress(0.0, "Loading documents for wiki compilation...")
 
