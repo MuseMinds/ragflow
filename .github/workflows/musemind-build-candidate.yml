@@ -90,10 +90,14 @@ jobs:
           import hashlib, json, os, pathlib, subprocess
           paths = ["api/apps/restful_apis/document_api.py", "api/db/services/file_service.py",
                    "rag/llm/musemind_gemini.py", "tools/musemind_patches/werkzeug_multipart.py",
-                   "tools/musemind_patches/werkzeug-multipart.patch"]
+                   "tools/musemind_patches/werkzeug-multipart.patch",
+                   "rag/utils/es_conn.py", "rag/app/naive.py", "rag/nlp/synonym.py",
+                   "api/utils/musemind_provider_contract.py", "api/apps/restful_apis/dataset_api.py",
+                   "api/apps/services/dataset_api_service.py"]
           result = {"source_commit": os.environ["SOURCE_SHA"],
                     "version": subprocess.check_output(["git", "describe", "--tags", "--match=v*", "--first-parent", "--always"], text=True).strip(),
                     "files": {path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() for path in paths},
+                    "sdk_files": {"ragflow_sdk/ragflow.py": hashlib.sha256(pathlib.Path("sdk/python/ragflow_sdk/ragflow.py").read_bytes()).hexdigest()},
                     "patch_ledger_sha256": hashlib.sha256(pathlib.Path("MUSEMIND_PATCHES.md").read_bytes()).hexdigest(),
                     "dockerfile_sha256": hashlib.sha256(pathlib.Path("Dockerfile").read_bytes()).hexdigest(),
                     "lockfile_sha256": hashlib.sha256(pathlib.Path("uv.lock").read_bytes()).hexdigest()}
@@ -115,7 +119,7 @@ jobs:
           docker builder prune --all --force
           df -h /
 
-      - name: Verify exact runtime sources and actual Quart multipart parser
+      - name: Verify exact runtime sources, SDK v3 and actual Quart multipart parser
         shell: bash
         run: |
           set -euo pipefail
