@@ -32,14 +32,15 @@ read `README.md`, `MUSEMIND_PATCHES.md` and the canonical RAG/provider-generatio
 
 ## Develop and Production delivery
 
-Normal fork qualification and deployment target Develop; the root monorepo `develop` pins the
-verified fork commit and immutable digest. Production receives only the release-pinned qualified
-digest through `../procedura-rilascio.md`. A fork branch or image publication is not independent
-Production release authority. Any new Production provider generation or changed semantics requires
-the canonical impact-specific qualification and decision route.
+The shared Develop/Production rules (gitlink pinning, release only through
+`../procedura-rilascio.md`, no inferred environment parity, branch cleanup after merge) live in
+the workspace `AGENTS.md`. A component push, workflow or image is never Production release
+authority. Component-specific facts:
 
-After every PR merge, delete its source branch remotely and locally once no active task or worktree
-uses it; preserve long-lived and still-active release or hotfix branches.
+- Root `develop` pins the verified fork commit and immutable digest; Production receives only the
+  release-pinned qualified digest.
+- Any new Production provider generation or changed semantics requires the canonical
+  impact-specific qualification and decision route.
 
 ## Working areas
 
