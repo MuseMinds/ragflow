@@ -49,6 +49,18 @@ class ScanSummaryTests(unittest.TestCase):
             self.assertEqual(summary["candidate_scan_gate"], "REVIEW_REQUIRED")
             self.assertEqual(summary["high_critical_findings"][0]["PkgName"], "nltk")
 
+    def test_multiple_fixed_versions_are_reported_not_rejected(self):
+        value = report()
+        value["Results"][0]["Vulnerabilities"] = [
+            {"Severity": "HIGH", "VulnerabilityID": "CVE-synthetic-1", "PkgName": "synthetic", "InstalledVersion": "1.0.0", "FixedVersion": "1.0.1, 2.0.0"}
+        ]
+        summary = module.summarize(value, report(True), IMAGE)
+        self.assertEqual(summary["candidate_scan_gate"], "REVIEW_REQUIRED")
+        self.assertEqual(summary["high_critical_findings"][0]["FixedVersion"], "1.0.1,2.0.0")
+        value["Results"][0]["Vulnerabilities"][0]["FixedVersion"] = "1.0.1 ; rm"
+        with self.assertRaisesRegex(ValueError, "FINDING_IDENTITY_INVALID"):
+            module.summarize(value, report(True), IMAGE)
+
     def test_unknown_secret_is_never_emitted(self):
         value = report(True)
         value["Results"][0]["Secrets"] = [{"Match": "synthetic-private-canary", "RuleID": "unknown-sensitive-rule"}]
