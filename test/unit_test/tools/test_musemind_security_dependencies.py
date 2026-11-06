@@ -218,7 +218,10 @@ def test_installed_security_floor(distribution, floor):
     assert Version(version(distribution)) >= Version(floor)
 
 
-def test_litellm_modules_used_by_ragflow_import():
+def test_litellm_modules_used_by_ragflow_import(monkeypatch):
+    # litellm fetches its model cost map over the network on import unless told to use the
+    # bundled copy; the offline fixture would otherwise reject the lookup.
+    monkeypatch.setenv("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     import litellm
     from litellm import logging as litellm_logging
     from litellm.integrations.custom_logger import CustomLogger
