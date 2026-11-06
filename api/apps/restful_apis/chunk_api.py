@@ -359,8 +359,11 @@ async def retrieval_test(tenant_id):
                 return get_error_data_result("An exact scope dataset is not accessible")
             return get_error_data_result(f"You don't own the dataset {id}.")
     if exact_mode:
+        # One membership read per dataset, not per pair: a single-dataset scope of N documents
+        # otherwise reads N*N rows synchronously on the event loop (MM-RF-0029).
+        documents_by_dataset = {dataset_id: set(KnowledgebaseService.list_documents_by_ids([dataset_id])) for dataset_id in kb_ids}
         for dataset_id, document_id in exact_pairs:
-            if document_id not in KnowledgebaseService.list_documents_by_ids([dataset_id]):
+            if document_id not in documents_by_dataset[dataset_id]:
                 return get_error_data_result("An exact scope document does not belong to its dataset")
     kbs = KnowledgebaseService.get_by_ids(kb_ids)
     embd_nms = list(set([split_model_name(kb.embd_id)[0] for kb in kbs]))

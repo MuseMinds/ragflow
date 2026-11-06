@@ -8,6 +8,7 @@ Live candidate/ranking qualification still belongs to the exact provider bundle.
 import ast
 import copy
 import json
+import logging
 import math
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -39,6 +40,7 @@ def connection():
     scope = {
         "copy": copy,
         "json": json,
+        "logging": logging,
         "Q": Q,
         "Search": Search,
         "ConnectionTimeout": ConnectionTimeout,
@@ -205,3 +207,28 @@ def test_non_vector_search_keeps_its_query_and_has_no_knn(connection, expression
     assert "knn" not in body
     assert matches(body["query"], fixture_document(content_ltks="alpha beta gamma delta"))
     assert not matches(body["query"], fixture_document(kb_id="other-museum", content_ltks="alpha beta gamma delta"))
+
+
+class _UnstringifiableResponse(dict):
+    """A search response whose full rendering must not happen with DEBUG off (MM-RF-0029)."""
+
+    def __str__(self):
+        raise AssertionError("search response rendered while DEBUG is disabled")
+
+    __repr__ = __str__
+
+
+def test_search_does_not_render_debug_payloads_when_debug_is_disabled(connection):
+    connection.logger.isEnabledFor.return_value = False
+    connection.es.search.return_value = _UnstringifiableResponse({"hits": {"total": {"value": 0}, "hits": []}, "timed_out": False})
+    search_body(connection, [text_expr(), dense_expr()])
+    connection.logger.isEnabledFor.assert_called_with(logging.DEBUG)
+    connection.logger.debug.assert_not_called()
+
+
+def test_search_still_logs_debug_payloads_when_debug_is_enabled(connection):
+    connection.logger.isEnabledFor.return_value = True
+    search_body(connection, [text_expr(), dense_expr()])
+    messages = [call.args[0] for call in connection.logger.debug.call_args_list]
+    assert any(" query: " in message for message in messages)
+    assert any(" res: " in message for message in messages)

@@ -830,6 +830,36 @@ own repositories, not to this provider ledger.
   rebuild, scan disposition or qualification gate is required, and the qualified bundle pin is
   unchanged. Upstream syncs that touch `CLAUDE.md` keep this regular-file form.
 
+## MM-RF-0029 — retrieval CPU: per-dataset exact-scope check and lazy ES debug payloads
+
+- Base: protected MuseMind `903f80dc4641a6f400539dd9e0216bc908377554`, unchanged upstream
+  `v0.26.4`. No upstream sync, dependency, model, parser, ranking or scope change.
+- Trigger: MMD-732/MMD-738 measured the single `ragflow-web` process as the retrieval ceiling
+  in Develop: about 0.47 s of process CPU per exact retrieval, about 1.5 retrievals/s at
+  p95 ≤ 5 s, collapse at 2/s. An in-container profile of a Salce-shaped request (one dataset,
+  200 exact pairs, `top_k` 64, `page_size` 20) attributed about 0.18 s to exact-scope
+  validation and about 0.12 s to debug payload rendering with DEBUG disabled.
+- Correction:
+  - `api/apps/restful_apis/chunk_api.py::retrieval_test` reads each scoped dataset's document
+    membership once instead of once per pair. With one dataset of N documents the old loop read
+    N×N rows synchronously on the event loop. The check stays fail-closed: any pair whose
+    document is outside its dataset still rejects the whole request before a provider call.
+  - `rag/utils/es_conn.py::ESConnection.search` builds the query `json.dumps` and response
+    `str(res)` debug messages only when the logger is enabled for DEBUG. The messages and
+    their content are unchanged when DEBUG is on.
+- Files: the two runtime files, `test/unit_test/rag/utils/test_es_hybrid_candidates.py`,
+  `test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py`
+  and the required CI step. Tests cover one membership read per dataset with 201 pairs, foreign
+  document rejection with zero provider calls, no response rendering with DEBUG off, and
+  unchanged debug messages with DEBUG on.
+- Measured effect (Develop, hot-patched experiment on the unchanged image, then recreated):
+  CPU per retrieval 0.47 s → 0.17–0.19 s. Direct load on `ragflow-web` with one process held
+  4/s at p95 1.0 s, against 1.5/s before; with three processes, 8/s at p95 1.4 s.
+- Qualification: exact-scope semantics, ranking inputs and response shape are unchanged. The
+  candidate image needs fresh image identity and scans, a Develop exact-retrieval smoke on the
+  deployed bundle and the MMD-738 load check. Provider generation identity is unchanged: no
+  re-ingestion or dataset rebuild.
+
 ## Qualification status
 
 | Evidence | Status |
