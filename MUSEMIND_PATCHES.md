@@ -860,6 +860,34 @@ own repositories, not to this provider ledger.
   deployed bundle and the MMD-738 load check. Provider generation identity is unchanged: no
   re-ingestion or dataset rebuild.
 
+## MM-RF-0030 — bounded dependency remediation for the MM-RF-0029 candidate
+
+- Base: protected MuseMind `d1b53b9e410660238e7056e5b9917c42811276df` (MM-RF-0029), unchanged
+  upstream `v0.26.4`. Dependency-only change; no source, model, parser, ranking or scope change.
+- Trigger: candidate workflow run `42284460712` built the MM-RF-0029 image and stopped before push
+  at the scan gate: 8 Critical and 49 High findings, all in libraries already in the deployed
+  `candidate-346cdb1c` image and published after its October scan. The failed image was not
+  pushed, qualified or deployed.
+- Changes (exact `uv lock --upgrade-package` selectors against the previous lock, official PyPI):
+  aiohttp `3.14.3 -> 3.14.4`, Authlib `1.7.2 -> 1.9.1`, brotli `1.2.0 -> 1.2.1`, certifi
+  `2026.1.4 -> 2026.10.18`, joserfc `1.7.1 -> 1.7.5`, litellm `1.84.0 -> 1.95.0`, nltk
+  `3.10.3 -> 3.10.4`, oauthlib `3.3.1 -> 4.0.1`, Pillow `12.3.0 -> 13.0.0`, pyasn1
+  `0.6.4 -> 0.6.5`, pypdf `6.19.0 -> 6.21.4`. aiohttp requires yarl `1.22.0 -> 1.25.1`.
+  `pyproject.toml` raises the matching direct floors, the litellm pin and the Pillow test-group
+  range. All 651 lock entries otherwise keep their versions and dependency edges.
+- Compatibility review: Pillow 13 removes `Image._show`, `ImageCmsProfile.product_*`,
+  `ExifTags.IFD.Makernote` and `Image.get_child_images()`, and changes `fromarray(mode=)`, I-mode
+  PNG clipping and `ImageColor.getcolor` for RGBa/La; none is used by RAGFlow sources. oauthlib
+  is reached only by the Google data-source connector, unused by MuseMind. litellm keeps the
+  modules RAGFlow imports.
+- Validation: required CI checks installed floors for the eleven libraries, imports the litellm
+  modules RAGFlow uses, and round-trips PNG/JPEG/TIFF through Pillow, alongside the existing
+  JWT/JWKS, PDF intake, provider, parser and SDK checks. The runtime smoke reports the new
+  versions. Image scans keep their thresholds and finding rules.
+- Semantic limits: Pillow and pypdf changes can affect image and PDF parsing. A Develop ingestion
+  of PDF and image sources on the deployed bundle precedes Production use; retrieval semantics do
+  not depend on these libraries.
+
 ## Qualification status
 
 | Evidence | Status |

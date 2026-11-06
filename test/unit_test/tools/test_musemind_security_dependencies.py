@@ -190,3 +190,52 @@ def test_pdf_encrypted_intake_remains_rejected():
 @pytest.mark.parametrize("payload", [b"%PDF-1.4\ncorrupt\n%%EOF\n", _ordinary_pdf()[:100]], ids=["corrupt", "truncated"])
 def test_pdf_corrupt_intake_remains_rejected(payload):
     assert validate_intake(payload, "application/pdf", 5) == "PDF_INVALID"
+
+
+# MM-RF-0030: installed security floors for the dependency remediation and smoke checks of the
+# libraries with major or wide version jumps. These do not replace the image scan.
+SECURITY_FLOORS = {
+    "aiohttp": "3.14.4",
+    "authlib": "1.9.1",
+    "brotli": "1.2.1",
+    "certifi": "2026.10.18",
+    "joserfc": "1.7.5",
+    "litellm": "1.95.0",
+    "nltk": "3.10.4",
+    "oauthlib": "4.0.1",
+    "pillow": "13.0.0",
+    "pyasn1": "0.6.5",
+    "pypdf": "6.21.4",
+}
+
+
+@pytest.mark.parametrize("distribution,floor", sorted(SECURITY_FLOORS.items()))
+def test_installed_security_floor(distribution, floor):
+    from importlib.metadata import version
+
+    from packaging.version import Version
+
+    assert Version(version(distribution)) >= Version(floor)
+
+
+def test_litellm_modules_used_by_ragflow_import():
+    import litellm
+    from litellm import logging as litellm_logging
+    from litellm.integrations.custom_logger import CustomLogger
+
+    assert callable(litellm.completion)
+    assert litellm_logging is not None
+    assert CustomLogger is not None
+
+
+def test_pillow_round_trips_the_formats_used_by_parsers():
+    from PIL import Image
+
+    source = Image.new("RGB", (32, 24), (200, 30, 60))
+    for image_format in ("PNG", "JPEG", "TIFF"):
+        stream = io.BytesIO()
+        source.save(stream, format=image_format)
+        decoded = Image.open(io.BytesIO(stream.getvalue()))
+        decoded.load()
+        assert decoded.size == (32, 24)
+        assert decoded.convert("L").size == (32, 24)
