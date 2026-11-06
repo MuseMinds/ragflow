@@ -624,6 +624,59 @@ class TestDocRoutesUnit:
         res = _run(_route_core(module.retrieval_test)("tenant-1"))
         assert "invalid or missing provenance" in res["message"]
 
+    def test_exact_retrieval_reads_dataset_membership_once_per_dataset(self, monkeypatch):
+        # MM-RF-0029: membership is read once per dataset, not once per pair, and a foreign
+        # document still fails the whole request closed before any provider call.
+        module = _load_doc_module(monkeypatch)
+        provider_calls = []
+        membership_reads = []
+
+        class _Retriever:
+            async def retrieval(self, *_args, **_kwargs):
+                provider_calls.append(True)
+                return {"chunks": [{"chunk_id": "chunk-1", "doc_id": "doc-1", "kb_id": "dataset-1"}], "total": 1}
+
+        members = {"dataset-1": [f"doc-{i}" for i in range(1, 201)], "dataset-2": ["doc-x"]}
+
+        def _members(ids):
+            membership_reads.append(tuple(ids))
+            return [doc for dataset_id in ids for doc in members[dataset_id]]
+
+        scope = [{"dataset_id": "dataset-1", "document_id": f"doc-{i}"} for i in range(1, 201)]
+        scope.append({"dataset_id": "dataset-2", "document_id": "doc-x"})
+        monkeypatch.setattr(module.settings, "retriever", _Retriever())
+        monkeypatch.setattr(module, "get_request_json", lambda: _AwaitableValue({"exact_mode": True, "document_scope": scope, "question": "q"}))
+        monkeypatch.setattr(module.KnowledgebaseService, "accessible", lambda **_kwargs: True)
+        monkeypatch.setattr(module.KnowledgebaseService, "list_documents_by_ids", _members)
+        monkeypatch.setattr(
+            module.KnowledgebaseService,
+            "get_by_ids",
+            lambda _ids: [SimpleNamespace(embd_id="embedding", tenant_id="tenant-1")],
+        )
+        monkeypatch.setattr(
+            module.KnowledgebaseService,
+            "get_by_id",
+            lambda _id: (True, SimpleNamespace(embd_id="embedding", tenant_id="tenant-1")),
+        )
+        monkeypatch.setattr(module, "split_model_name", lambda _name: ("embedding", "factory"))
+        monkeypatch.setattr(module, "get_model_config_from_provider_instance", lambda *_args, **_kwargs: SimpleNamespace())
+        monkeypatch.setattr(module, "LLMBundle", lambda *_args, **_kwargs: SimpleNamespace())
+        monkeypatch.setattr(module, "label_question", lambda *_args, **_kwargs: {})
+
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert res["code"] == 0, res
+        # Two per-dataset pair checks plus the route's existing combined document check.
+        assert sorted(read for read in membership_reads if len(read) == 1) == [("dataset-1",), ("dataset-2",)]
+        assert len(membership_reads) == 3
+        assert len(provider_calls) == 1
+
+        membership_reads.clear()
+        foreign = scope[:-1] + [{"dataset_id": "dataset-2", "document_id": "doc-1"}]
+        monkeypatch.setattr(module, "get_request_json", lambda: _AwaitableValue({"exact_mode": True, "document_scope": foreign, "question": "q"}))
+        res = _run(_route_core(module.retrieval_test)("tenant-1"))
+        assert "does not belong to its dataset" in res["message"]
+        assert len(provider_calls) == 1
+
     def test_chunk_positions_validation_error(self, monkeypatch):
         module = _load_restful_chunk_module(monkeypatch)
         with pytest.raises(ValueError) as exc_info:

@@ -14,6 +14,7 @@
 #  limitations under the License.
 #
 
+import logging
 import re
 import json
 import time
@@ -271,7 +272,10 @@ class ESConnection(ESConnectionBase):
         vector_fields = [f for f in (select_fields or []) if f.endswith("_vec")]
         if vector_fields:
             q["fields"] = vector_fields
-        self.logger.debug(f"ESConnection.search {str(index_names)} query: " + json.dumps(q))
+        # Build debug payloads only when DEBUG is enabled: serializing every query/response
+        # eagerly cost about a quarter of the retrieval CPU with logging off (MM-RF-0029).
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(f"ESConnection.search {str(index_names)} query: " + json.dumps(q))
 
         for i in range(ATTEMPT_TIME):
             try:
@@ -282,7 +286,8 @@ class ESConnection(ESConnectionBase):
                     res = self._es_search_once(index_names, q, track_total_hits=True)
                 if str(res.get("timed_out", "")).lower() == "true":
                     raise Exception("Es Timeout.")
-                self.logger.debug(f"ESConnection.search {str(index_names)} res: " + str(res))
+                if self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(f"ESConnection.search {str(index_names)} res: " + str(res))
                 return res
             except ConnectionTimeout:
                 self.logger.exception("ES request timeout")

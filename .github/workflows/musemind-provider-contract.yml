@@ -312,6 +312,7 @@ jobs:
         run: >-
           .venv/bin/pytest --noconftest
           test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py::TestDocRoutesUnit::test_exact_retrieval_fails_closed_and_validates_provenance
+          test/testcases/test_http_api/test_file_management_within_dataset/test_doc_sdk_routes_unit.py::TestDocRoutesUnit::test_exact_retrieval_reads_dataset_membership_once_per_dataset
 
       - name: Test create-only upload and token redaction
         run: >-
