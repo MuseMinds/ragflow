@@ -200,7 +200,7 @@ SECURITY_FLOORS = {
     "brotli": "1.2.1",
     "certifi": "2026.10.18",
     "joserfc": "1.7.5",
-    "litellm": "1.95.0",
+    "litellm": "1.100.4",
     "nltk": "3.10.4",
     "oauthlib": "4.0.1",
     "pillow": "13.0.0",

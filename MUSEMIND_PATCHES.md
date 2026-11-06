@@ -888,6 +888,20 @@ own repositories, not to this provider ledger.
   of PDF and image sources on the deployed bundle precedes Production use; retrieval semantics do
   not depend on these libraries.
 
+## MM-RF-0031 — litellm security update for the MM-RF-0030 candidate
+
+- Base: protected MuseMind `0f699486fc3d6ef89a3b83d7c0de1658fb213c97`, unchanged upstream
+  `v0.26.4`. Dependency-only change; no source, model, parser, ranking or scope change.
+- Trigger: candidate workflow run `42294738127` built the MM-RF-0030 image and stopped before push
+  at the scan gate with one High finding: `CVE-2026-114612` in litellm `1.95.0`, fixed in
+  `1.100.4`. The image was not pushed, qualified or deployed.
+- Changes: the litellm pin moves `1.95.0 -> 1.100.4` (`uv lock --upgrade-package litellm`,
+  official PyPI). Its declared requirements move boto3/botocore `1.42.25 -> 1.43.126`,
+  s3transfer `0.16.0 -> 0.19.3`, pydantic-settings `2.12.0 -> 2.16.2` and python-dotenv
+  `1.2.1 -> 1.2.4`. All other lock entries keep their versions.
+- Validation: the MM-RF-0030 floor and litellm import tests now require `1.100.4`; the image
+  scan keeps its thresholds and finding rules.
+
 ## Qualification status
 
 | Evidence | Status |
