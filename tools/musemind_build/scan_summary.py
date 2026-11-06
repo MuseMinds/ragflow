@@ -59,7 +59,10 @@ def summarize(vulnerability: dict, secret: dict, image_id: str) -> dict:
             if severity == "HIGH" and tuple(item.get(key, "") for key in ("VulnerabilityID", "PkgName", "InstalledVersion", "FixedVersion")) != REVIEWED_HIGH:
                 unreviewed_high += 1
             if severity in {"HIGH", "CRITICAL"}:
+                # Trivy lists several fixed releases as "a, b"; drop only that separator space so the
+                # character allowlist below stays unchanged for every other value.
                 identity = {key: item.get(key, "") for key in ("VulnerabilityID", "PkgName", "InstalledVersion", "FixedVersion")}
+                identity = {key: value.replace(", ", ",") if isinstance(value, str) else value for key, value in identity.items()}
                 if not all(isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9@._+:/,~=<>-]{0,160}", value) for value in identity.values()):
                     raise ValueError("FINDING_IDENTITY_INVALID")
                 if len(review_findings) < 100:
