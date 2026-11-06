@@ -123,7 +123,7 @@ def main() -> int:
                     "quart_parser_cases": cases,
                     "source_file_count": len(expected["files"]),
                     "python_version": platform.python_version(),
-                    "dependency_versions": {name: importlib.metadata.version(name) for name in ("anyio", "fsspec", "pyjwt", "pypdf", "urllib3", "nltk")},
+                    "dependency_versions": {name: importlib.metadata.version(name) for name in ("anyio", "fsspec", "pyjwt", "pypdf", "urllib3", "nltk", "pillow", "litellm", "authlib", "oauthlib", "aiohttp")},
                     "werkzeug_version": importlib.metadata.version("werkzeug"),
                     "werkzeug_source_sha256": patch["source_sha256"],
                     **sdk,

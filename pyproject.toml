@@ -90,7 +90,7 @@ dependencies = [
     "pyobvector==0.2.22",
     "pyodbc>=5.2.0,<6.0.0",
     "pypandoc>=1.16",
-    "pypdf>=6.19.0",
+    "pypdf>=6.21.4",
     "python-calamine>=0.4.0",
     "python-docx>=1.1.2,<2.0.0",
     "paramiko>=3.5.1",
@@ -162,7 +162,7 @@ dependencies = [
     # symbol is missing — see PR #15952 CI run 27414495913), and the
     # 1.82.6/1.82.7/1.82.8 minors have a broken `litellm.caching.caching`
     # import chain. Pin to a single known-good 1.82.x release.
-    "litellm==1.84.0",
+    "litellm==1.95.0",
     #    "pip>=25.2",
     #    "imageio-ffmpeg>=0.6.0",
     #    "cryptography==46.0.3",
@@ -178,14 +178,14 @@ dependencies = [
     "python-telegram-bot>=21.0",
     "line-bot-sdk>=3.0.0",
     "wechatpy>=1.8.18",
-    "aiohttp>=3.14.3",
+    "aiohttp>=3.14.4",
 ]
 
 [dependency-groups]
 test = [
     "hypothesis>=6.132.0",
     "openpyxl>=3.1.5",
-    "pillow>=12.3.0,<13.0.0",
+    "pillow>=13.0.0,<14.0.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=1.3.0",
     "pytest-xdist>=3.8.0",
@@ -204,7 +204,7 @@ test = [
 constraint-dependencies = [
     # CVE-2026-30922, CVE-2026-59884, CVE-2026-59885 and CVE-2026-59886:
     # pyasn1 < 0.6.4 is vulnerable; pulled in transitively via google-auth / rsa / pyasn1-modules.
-    "pyasn1>=0.6.4",
+    "pyasn1>=0.6.5",
     # Python 3.13 added pathlib.PurePath.parser as a public class attribute holding
     # the posixpath/ntpath module. trio<0.26 introspects all Path class attributes to
     # generate async forwards and raises TypeError on any non-callable attribute it
@@ -219,7 +219,7 @@ constraint-dependencies = [
     "lxml_html_clean>=0.4.5",
     # inscriptis 2.7.0 pins lxml<6.0.0 and blocks the lxml security floor.
     "inscriptis>=2.7.3",
-    "nltk>=3.10.3",
+    "nltk>=3.10.4",
     "thrift>=0.24.0",
     "protobuf>=5.29.6",
     "httplib2>=0.32.0",
